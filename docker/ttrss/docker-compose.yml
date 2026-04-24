@@ -1,0 +1,52 @@
+## ============================================================
+## TT-RSS Stack (standalone макет)
+## Образ: wangqiru/ttrss — all-in-one (PHP + Nginx + крон)
+##
+## Запуск:  docker compose -f docker/ttrss/docker-compose.yml up -d
+## Доступ:  http://localhost:8080
+## Логин:   admin / password
+## ============================================================
+
+services:
+
+  # ── PostgreSQL для TT-RSS ─────────────────────────────────────────────────
+  ttrss-db:
+    image: postgres:15-alpine
+    container_name: ttrss-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ttrss
+      POSTGRES_PASSWORD: ${TTRSS_DB_PASSWORD:-ttrss_secret}
+      POSTGRES_DB:       ttrss
+    volumes:
+      - ttrss_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ttrss"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  # ── TT-RSS (all-in-one: PHP-FPM + Nginx + обновлятор) ────────────────────
+  ttrss:
+    image: wangqiru/ttrss:latest
+    container_name: ttrss
+    restart: unless-stopped
+    depends_on:
+      ttrss-db:
+        condition: service_healthy
+    ports:
+      - "${TTRSS_PORT:-8080}:80"
+    environment:
+      SELF_URL_PATH: http://localhost:${TTRSS_PORT:-8080}/
+      DB_HOST:       ttrss-db
+      DB_PORT:       5432
+      DB_NAME:       ttrss
+      DB_USER:       ttrss
+      DB_PASS:       ${TTRSS_DB_PASSWORD:-ttrss_secret}
+      ENABLE_PLUGINS: auth_internal,fever
+    volumes:
+      - ttrss_data:/var/www/html/tt-rss/feed-icons
+
+volumes:
+  ttrss_db_data:
+  ttrss_data:

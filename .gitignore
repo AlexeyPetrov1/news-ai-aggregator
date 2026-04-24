@@ -1,0 +1,26 @@
+# R
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rcheck/
+*.tar.gz
+
+# Данные (не коммитим)
+data/*.rds
+data/*.RDS
+data/*.csv
+inst/shiny/data/
+
+# Секреты
+.env
+.env.*
+*.env
+
+# Временные отладочные скрипты
+data-raw/_*.R
+data-raw/_*.sh
+
+# OS
+.DS_Store
+Thumbs.db

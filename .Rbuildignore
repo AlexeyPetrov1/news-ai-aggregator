@@ -1,0 +1,10 @@
+^\.git$
+^\.gitignore$
+^docker$
+^docker-compose\.yml$
+^Dockerfile$
+^\.env.*$
+^data-raw$
+^inst/mcp/Dockerfile$
+^README\.md$
+^\.Rprofile$
