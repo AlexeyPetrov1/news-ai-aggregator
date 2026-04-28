@@ -36,7 +36,7 @@
 | Колоночная БД | ClickHouse | 24.x |
 | Дашборд | Shiny + shinydashboard | CRAN |
 | Визуализация | plotly | CRAN |
-| Тематическое моделирование | topicmodels (LDA) + tidytext | CRAN |
+| Тематическое моделирование | topicmodels (LDA), tidytext, YandexGPT | CRAN / Yandex Cloud |
 | MCP-протокол | JSON-RPC 2.0 stdio | — |
 | Контейнеры | Docker Compose | — |
 | Хостинг кода | GitHub | — |
@@ -85,7 +85,7 @@ full <- ttrss_get_article(sid, article_ids)
 
 ## Этап 3 — Тематическое моделирование (LDA)
 
-Файл: `data-raw/run_lda.R`
+Файл: `R/classify.R` (функция `classify_news()`)
 
 Алгоритм:
 1. Токенизация заголовков + текстов (`tidytext::unnest_tokens`)
@@ -105,6 +105,17 @@ full <- ttrss_get_article(sid, article_ids)
 - Threat Intelligence
 
 Результат записывается обратно в `data/news_raw.rds` с добавленными колонками `topic`, `topic_label`, `topic_prob`.
+
+Дополнительно в `R/classify.R` реализованы альтернативные методы:
+- `method = "kmeans"` — кластеризация TF-IDF;
+- `method = "llm"` — классификация через Anthropic API;
+- `method = "yandex_llm"` — классификация через Yandex Cloud Assistant API (`gpt://<folder>/<model>`).
+
+Для `yandex_llm` добавлены практические улучшения:
+- retry с exponential backoff для HTTP 429/5xx;
+- session-cache ответов для повторяющихся текстов;
+- persistent cache в `data/yandex_llm_cache.rds` между запусками;
+- fallback в категорию `"Без категории"` при сетевой/API ошибке.
 
 ---
 
@@ -286,8 +297,10 @@ repeat {
 ttrssR/
 ├── R/
 │   ├── db.R              # ClickHouse: connect, read, write, schema
-│   ├── ttrss_api.R       # TT-RSS JSON API: login, headlines, articles
-│   └── lda_classify.R    # LDA: tokenize, train, predict
+│   ├── api.R             # TT-RSS JSON API: login, headlines, articles
+│   ├── etl.R             # ETL: сбор и нормализация статей
+│   ├── classify.R        # ML: LDA / KMeans / LLM-классификация
+│   └── app.R             # Запуск Shiny и MCP
 ├── inst/
 │   ├── shiny/
 │   │   ├── ui.R          # Shiny UI (shinydashboard)
@@ -297,8 +310,7 @@ ttrssR/
 │       └── server.R        # MCP HTTP транспорт (plumber, для Docker)
 ├── data-raw/
 │   ├── add_security_feeds.R    # Добавление RSS-лент в TT-RSS
-│   ├── run_lda.R               # Запуск LDA-классификации
-│   └── _load_to_clickhouse.R   # Загрузка RDS → ClickHouse
+│   └── fetch_news.R            # Сбор + классификация + сохранение
 ├── data/
 │   └── news_raw.rds      # Собранные и классифицированные статьи
 ├── docker-compose.yml
@@ -320,13 +332,17 @@ ttrssR/
 ### 1. Запуск стека
 
 ```bash
-cd D:/prpject_R/ttrssR
-docker compose up -d
+# Запустить TT-RSS (отдельный compose)
+docker compose -f docker/ttrss/docker-compose.yml up -d
+
+# Запустить аналитический стек (ClickHouse + Shiny + MCP)
+docker compose up -d --build
 ```
 
 Сервисы:
-- TT-RSS: http://localhost:8280 (admin / password)
-- Shiny: http://localhost:3838
+- TT-RSS: http://localhost:8080 (admin / password)
+- Shiny: http://localhost:3838/ttrss
+- MCP: http://localhost:8000/mcp
 - ClickHouse HTTP: http://localhost:8123
 
 ### 2. Добавление RSS-лент
@@ -340,28 +356,70 @@ source("data-raw/add_security_feeds.R")
 ```r
 library(ttrssR)
 # Сбор статей из TT-RSS
-df <- ttrss_collect_all()
-# LDA-классификация
-df <- lda_classify(df, k = 8)
+df <- fetch_news_dataframe(
+  base_url = "http://localhost:8080",
+  user = "admin",
+  password = "password",
+  max_articles = 500
+)
+# Классификация (LDA / kmeans / llm / yandex_llm)
+df <- classify_news(df, n_topics = 8, method = "lda")
 saveRDS(df, "data/news_raw.rds")
 ```
 
-### 4. Загрузка в ClickHouse
+Пример для YandexGPT:
 
 ```r
-source("data-raw/_load_to_clickhouse.R")
+Sys.setenv(
+  YANDEX_CLOUD_FOLDER = "<folder_id>",
+  YANDEX_CLOUD_API_KEY = "<api_key>",
+  YANDEX_CLOUD_MODEL = "yandexgpt-lite/rc"
+)
+
+df <- classify_news(df, method = "yandex_llm")
 ```
+
+Оценка качества тем:
+
+```r
+# После любой классификации (LDA/KMeans/LLM)
+metrics <- evaluate_topic_quality(df)
+print(metrics$label_coverage)
+print(metrics$topic_distinctiveness)
+print(metrics$per_topic)
+
+# Либо сразу через classify_news:
+df <- classify_news(df, method = "lda", compute_quality = TRUE)
+attr(df, "topic_quality")
+```
+
+### 4. Автоматизированный сценарий (рекомендуется)
+
+```r
+source("data-raw/fetch_news.R")
+```
+
+### 4.1 Сравнение методов классификации
+
+```r
+source("data-raw/compare_methods.R")
+```
+
+Скрипт запускает `lda`, `kmeans` и (если заданы Yandex env) `yandex_llm` на одном датасете
+и сохраняет метрики качества в:
+- `data/method_comparison.csv`
+- `data/method_comparison.rds`
 
 ### 5. Открыть дашборд
 
-Перейти на http://localhost:3838
+Перейти на http://localhost:3838/ttrss
 
 ### 6. Подключить MCP к Claude Code
 
 ```bash
 claude mcp add ttrssR \
   "C:\Program Files\R\R-4.5.3\bin\Rscript.exe" \
-  "D:\prpject_R\ttrssR\inst\mcp\stdio_server.R" \
+  "D:\path\to\news-ai-aggregator\inst\mcp\stdio_server.R" \
   --env CH_HOST=localhost --env CH_PORT=9000 \
   --env CH_DB=ttrss --env CH_USER=default --env CH_PASSWORD=
 ```
