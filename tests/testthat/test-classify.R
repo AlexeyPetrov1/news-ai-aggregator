@@ -41,3 +41,29 @@ test_that("classify_news llm errors without api key", {
   expect_error(classify_news(df, method = "llm", llm_api_key = NULL),
                "llm_api_key")
 })
+
+test_that("classify_news yandex_llm errors without api key", {
+  df <- make_df(3)
+  expect_error(
+    classify_news(
+      df,
+      method = "yandex_llm",
+      yandex_api_key = NULL,
+      yandex_folder_id = "b1examplefolder"
+    ),
+    "yandex_api_key|YANDEX_CLOUD_API_KEY"
+  )
+})
+
+test_that("classify_news yandex_llm errors without folder id", {
+  df <- make_df(3)
+  expect_error(
+    classify_news(
+      df,
+      method = "yandex_llm",
+      yandex_api_key = "dummy-key",
+      yandex_folder_id = ""
+    ),
+    "yandex_folder_id|YANDEX_CLOUD_FOLDER"
+  )
+})

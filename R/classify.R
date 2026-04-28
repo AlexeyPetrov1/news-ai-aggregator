@@ -2,17 +2,26 @@
 #' @description Three interchangeable back-ends:
 #'   \code{"lda"} (Latent Dirichlet Allocation),
 #'   \code{"kmeans"} (TF-IDF + k-means clustering), and
-#'   \code{"llm"} (LLM API call per article).
+#'   \code{"llm"} / \code{"yandex_llm"} (LLM API call per article).
 
 #' Classify articles into topics
 #'
 #' @param df        Data frame produced by \code{\link{fetch_news_dataframe}}.
 #'   Must contain a \code{content_text} column.
-#' @param n_topics  Number of topics (ignored for \code{"llm"} method).
-#' @param method    One of \code{"lda"}, \code{"kmeans"}, \code{"llm"}.
+#' @param n_topics  Number of topics (ignored for \code{"llm"} and
+#'   \code{"yandex_llm"} methods).
+#' @param method    One of \code{"lda"}, \code{"kmeans"}, \code{"llm"},
+#'   \code{"yandex_llm"}.
 #' @param llm_api_key  API key (required for \code{method = "llm"}).
 #' @param llm_base_url Base URL of the LLM API
 #'   (default: Anthropic \code{https://api.anthropic.com}).
+#' @param yandex_api_key API key for Yandex Cloud Assistant API.
+#'   If \code{NULL}, reads \code{YANDEX_CLOUD_API_KEY}.
+#' @param yandex_folder_id Yandex Cloud folder id.
+#'   If \code{NULL}, reads \code{YANDEX_CLOUD_FOLDER}.
+#' @param yandex_model Yandex model name without folder prefix
+#'   (e.g. \code{"yandexgpt-lite/rc"}).
+#' @param yandex_base_url Base URL for Yandex Assistant API.
 #' @param language  Stopword language passed to \code{tidytext::get_stopwords()}.
 #'   Use \code{c("ru", "en")} for bilingual corpora (default).
 #' @return The original data frame with additional columns:
@@ -21,9 +30,13 @@
 #' @export
 classify_news <- function(df,
                           n_topics      = 10L,
-                          method        = c("lda", "kmeans", "llm"),
+                          method        = c("lda", "kmeans", "llm", "yandex_llm"),
                           llm_api_key   = NULL,
                           llm_base_url  = "https://api.anthropic.com",
+                          yandex_api_key = NULL,
+                          yandex_folder_id = NULL,
+                          yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-lite/rc"),
+                          yandex_base_url = Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://rest-assistant.api.cloud.yandex.net/v1"),
                           language      = c("ru", "en")) {
 
   method <- match.arg(method)
@@ -37,7 +50,14 @@ classify_news <- function(df,
   result <- switch(method,
     lda    = .classify_lda(df, n_topics, language),
     kmeans = .classify_kmeans(df, n_topics, language),
-    llm    = .classify_llm(df, llm_api_key, llm_base_url)
+    llm    = .classify_llm(df, llm_api_key, llm_base_url),
+    yandex_llm = .classify_yandex_llm(
+      df,
+      api_key = yandex_api_key,
+      folder_id = yandex_folder_id,
+      model = yandex_model,
+      base_url = yandex_base_url
+    )
   )
 
   cli::cli_inform("Classification complete.")
@@ -192,4 +212,75 @@ classify_news <- function(df,
   df$topic_label <- labels
   df$topic       <- as.integer(factor(labels))
   df
+}
+
+# ── Yandex LLM ────────────────────────────────────────────────────────────────
+
+.classify_yandex_llm <- function(df, api_key, folder_id, model, base_url) {
+  api_key <- api_key %||% Sys.getenv("YANDEX_CLOUD_API_KEY", "")
+  folder_id <- folder_id %||% Sys.getenv("YANDEX_CLOUD_FOLDER", "")
+
+  if (!nzchar(api_key)) {
+    cli::cli_abort("Provide {.arg yandex_api_key} or set YANDEX_CLOUD_API_KEY for method='yandex_llm'.")
+  }
+  if (!nzchar(folder_id)) {
+    cli::cli_abort("Provide {.arg yandex_folder_id} or set YANDEX_CLOUD_FOLDER for method='yandex_llm'.")
+  }
+
+  endpoint <- paste0(sub("/+$", "", base_url), "/responses")
+  model_uri <- sprintf("gpt://%s/%s", folder_id, model)
+
+  labels <- vapply(seq_len(nrow(df)), function(i) {
+    text <- substr(
+      paste(df$title[i] %||% "", df$content_text[i] %||% ""),
+      1L, 1200L
+    )
+
+    body <- list(
+      model = model_uri,
+      temperature = 0.3,
+      instructions = paste0(
+        "Определи тематическую категорию для следующей новости. ",
+        "Ответь только названием категории (1-3 слова) на русском языке."
+      ),
+      input = text,
+      max_output_tokens = 60L
+    )
+
+    req <- httr2::request(endpoint) |>
+      httr2::req_headers(
+        "Authorization" = paste("Bearer", api_key),
+        "Content-Type" = "application/json"
+      ) |>
+      httr2::req_body_json(body) |>
+      httr2::req_error(is_error = \(r) FALSE)
+
+    resp <- tryCatch(httr2::req_perform(req), error = function(e) NULL)
+    if (is.null(resp) || httr2::resp_is_error(resp)) return("Без категории")
+
+    parsed <- httr2::resp_body_json(resp, simplifyVector = FALSE)
+    txt <- .extract_response_output_text(parsed)
+    trimws(txt %||% "Без категории")
+  }, character(1L))
+
+  df$topic_label <- labels
+  df$topic       <- as.integer(factor(labels))
+  df
+}
+
+.extract_response_output_text <- function(parsed) {
+  txt <- parsed$output_text %||% NULL
+  if (!is.null(txt) && nzchar(txt)) return(txt)
+
+  output <- parsed$output %||% list()
+  if (!length(output)) return(NULL)
+
+  parts <- unlist(lapply(output, function(item) {
+    content <- item$content %||% list()
+    if (!length(content)) return(NULL)
+    unlist(lapply(content, function(p) p$text %||% NULL), use.names = FALSE)
+  }), use.names = FALSE)
+
+  if (!length(parts)) return(NULL)
+  paste(parts[nzchar(parts)], collapse = " ")
 }

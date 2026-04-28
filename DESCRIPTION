@@ -6,7 +6,8 @@ Authors@R:
     person("Author", "Name", , "author@example.com", role = c("aut", "cre"))
 Description: Collects news articles from a Tiny Tiny RSS (TT-RSS) instance via
     its JSON API, normalizes them into a unified data frame, performs thematic
-    classification using LDA topic modelling or LLM-based tagging, stores
+    classification using LDA topic modelling or LLM-based tagging (Anthropic /
+    YandexGPT), stores
     results in ClickHouse, and exposes an interactive Shiny dashboard and an
     MCP (Model Context Protocol) server for AI-agent queries.
 License: MIT + file LICENSE

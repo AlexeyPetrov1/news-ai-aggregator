@@ -36,7 +36,7 @@
 | Колоночная БД | ClickHouse | 24.x |
 | Дашборд | Shiny + shinydashboard | CRAN |
 | Визуализация | plotly | CRAN |
-| Тематическое моделирование | topicmodels (LDA) + tidytext | CRAN |
+| Тематическое моделирование | topicmodels (LDA), tidytext, YandexGPT | CRAN / Yandex Cloud |
 | MCP-протокол | JSON-RPC 2.0 stdio | — |
 | Контейнеры | Docker Compose | — |
 | Хостинг кода | GitHub | — |
@@ -105,6 +105,11 @@ full <- ttrss_get_article(sid, article_ids)
 - Threat Intelligence
 
 Результат записывается обратно в `data/news_raw.rds` с добавленными колонками `topic`, `topic_label`, `topic_prob`.
+
+Дополнительно в `R/classify.R` реализованы альтернативные методы:
+- `method = "kmeans"` — кластеризация TF-IDF;
+- `method = "llm"` — классификация через Anthropic API;
+- `method = "yandex_llm"` — классификация через Yandex Cloud Assistant API (`gpt://<folder>/<model>`).
 
 ---
 
@@ -351,9 +356,21 @@ df <- fetch_news_dataframe(
   password = "password",
   max_articles = 500
 )
-# Классификация (LDA / kmeans / llm)
+# Классификация (LDA / kmeans / llm / yandex_llm)
 df <- classify_news(df, n_topics = 8, method = "lda")
 saveRDS(df, "data/news_raw.rds")
+```
+
+Пример для YandexGPT:
+
+```r
+Sys.setenv(
+  YANDEX_CLOUD_FOLDER = "<folder_id>",
+  YANDEX_CLOUD_API_KEY = "<api_key>",
+  YANDEX_CLOUD_MODEL = "yandexgpt-lite/rc"
+)
+
+df <- classify_news(df, method = "yandex_llm")
 ```
 
 ### 4. Автоматизированный сценарий (рекомендуется)
