@@ -37,7 +37,7 @@ ui <- dashboardPage(
           box(title = "Статьи по темам", width = 6,
               status = "info", solidHeader = TRUE,
               plotlyOutput("plot_topics", height = "300px")),
-          box(title = "Статьи по источникам", width = 6,
+          box(title = "Статьи по источникам (гистограмма)", width = 6,
               status = "warning", solidHeader = TRUE,
               plotlyOutput("plot_feeds_pie", height = "300px"))
         )

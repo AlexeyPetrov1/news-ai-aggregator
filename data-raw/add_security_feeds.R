@@ -11,40 +11,35 @@ TTRSS_URL  <- "http://localhost:8080"
 TTRSS_USER <- "admin"
 TTRSS_PASS <- "password"
 
-# ── Источники по категориям ───────────────────────────────────────────────────
+# ── Источники по категориям (только русскоязычные) ───────────────────────────
 
 feeds <- list(
 
-  # Threat Research от вендоров (первичные данные по APT)
-  "Threat Research" = c(
-    "https://securelist.com/feed/",                            # Kaspersky GReAT — лучший по APT/RU
-    "https://unit42.paloaltonetworks.com/feed/",               # Unit 42 (Palo Alto)
-    "https://blog.talosintelligence.com/feeds/posts/default",  # Cisco Talos
-    "https://www.welivesecurity.com/feed/",                    # ESET Research
-    "https://www.crowdstrike.com/blog/feed/",                  # CrowdStrike
-    "https://www.microsoft.com/en-us/security/blog/feed/"      # Microsoft Threat Intelligence
+  # Исследования угроз — российские вендоры
+  "Threat Research (RU)" = c(
+    "https://securelist.ru/feed/",                                    # Kaspersky GReAT (рус.)
+    "https://www.kaspersky.ru/blog/feed/",                            # Kaspersky блог
+    "https://www.ptsecurity.com/ru-ru/about/news/rss/"               # Positive Technologies
   ),
 
-  # Новости об атаках и кампаниях (EN)
-  "Attack News (EN)" = c(
-    "https://feeds.feedburner.com/TheHackersNews",             # The Hacker News
-    "https://www.bleepingcomputer.com/feed/",                  # BleepingComputer
-    "https://krebsonsecurity.com/feed/",                       # Krebs on Security
-    "https://www.darkreading.com/rss.xml",                     # Dark Reading
-    "https://www.securityweek.com/feed/"                       # SecurityWeek
+  # Новости ИБ — русскоязычные СМИ
+  "ИБ-новости (RU)" = c(
+    "https://www.anti-malware.ru/rss.xml",                            # Anti-Malware.ru
+    "https://www.securitylab.ru/rss/",                                # SecurityLab
+    "https://xakep.ru/feed/",                                         # Хакер.ру
+    "https://cisoclub.ru/feed/"                                       # CISO Club
   ),
 
-  # Государственные / CERT предупреждения
-  "CERT / Gov Alerts" = c(
-    "https://www.cisa.gov/uscert/ncas/alerts.xml",             # US-CERT (CISA)
-    "https://www.ncsc.gov.uk/api/1/services/v1/report-rss-feed.xml" # UK NCSC
+  # Профессиональное сообщество
+  "Сообщество (RU)" = c(
+    "https://habr.com/ru/rss/hub/information_security/articles/",     # Хабр — ИБ
+    "https://habr.com/ru/rss/hub/netsecurity/articles/"               # Хабр — сетевая безопасность
   ),
 
-  # Российские источники по APT и атакам
-  "APT / Атаки (RU)" = c(
-    "https://www.anti-malware.ru/rss.xml",                     # Anti-Malware.ru
-    "https://www.securitylab.ru/rss/",                         # SecurityLab
-    "https://habr.com/ru/rss/hub/information_security/articles/" # Хабр ИБ
+  # Государственные / CERT
+  "CERT / Регуляторы (RU)" = c(
+    "https://bdu.fstec.ru/news/rss",                                  # БДУ ФСТЭК
+    "https://safe-surf.ru/rss/"                                       # SafeSurf (НКЦКИ)
   )
 )
 

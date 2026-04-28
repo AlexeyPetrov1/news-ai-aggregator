@@ -168,13 +168,14 @@ server <- function(input, output, session) {
       count(feed_title, sort = TRUE) |>
       head(12)
     req(nrow(fc) > 0)
-    plot_ly(fc, labels = ~feed_title, values = ~n, type = "pie",
-            hole = 0.3,
-            textposition = "inside",
-            textinfo = "percent") |>
-      layout(showlegend = TRUE,
-             legend = list(orientation = "v", x = 1, y = 0.5),
-             margin = list(l = 0, r = 120, t = 10, b = 10))
+    plot_ly(fc,
+            x = ~reorder(feed_title, n),
+            y = ~n,
+            type = "bar",
+            marker = list(color = "#f39c12")) |>
+      layout(xaxis = list(title = "", tickangle = -35),
+             yaxis = list(title = "Статей"),
+             margin = list(l = 40, r = 20, t = 10, b = 130))
   })
 
   # ── Таблицы ───────────────────────────────────────────────────────────────
