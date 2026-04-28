@@ -1,473 +1,225 @@
-# ttrssR — AI-агрегатор новостей по кибербезопасности
+# ttrssR: Cybersecurity News ML Pipeline
 
-Полный конвейер: сбор RSS → хранение в ClickHouse → LDA-классификация → Shiny-дашборд → MCP-сервер для Claude Code.
+`ttrssR` is an R package and service stack for end-to-end cybersecurity news analytics:
 
-## Архитектура
+RSS ingestion -> normalization -> topic classification -> ClickHouse storage -> Shiny dashboard -> MCP tools for AI agents.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Docker Compose Stack                         │
-│                                                                     │
-│  ┌──────────┐    ┌────────────────┐    ┌────────────────────────┐  │
-│  │  TT-RSS  │───▶│    ttrssR      │───▶│      ClickHouse        │  │
-│  │(RSS агг.)│    │  (R-пакет)     │    │  (колонч. БД)          │  │
-│  │:8280     │    │  collect/LDA   │    │  :9000                 │  │
-│  └──────────┘    └────────────────┘    └──────────┬─────────────┘  │
-│                                                   │                │
-│                         ┌─────────────────────────┤                │
-│                         ▼                         ▼                │
-│               ┌──────────────────┐   ┌────────────────────────┐   │
-│               │  Shiny Dashboard │   │   MCP stdio Server     │   │
-│               │  :3838           │   │   (Rscript процесс)    │   │
-│               └──────────────────┘   └────────────┬───────────┘   │
-└─────────────────────────────────────────────────┐─┘               │
-                                                  ▼                  │
-                                          Claude Code (LLM)          │
-                                          работает с данными          │
-                                          через MCP-инструменты       │
-```
+## Project Scope
 
-## Технологический стек
+- Domain: threat intelligence, incident news, vulnerability updates, malware and phishing monitoring.
+- Data source: TT-RSS via JSON API.
+- Storage: ClickHouse (analytical queries and summaries).
+- ML: `lda`, `kmeans`, `llm`, `yandex_llm` + quality evaluation.
+- Delivery: Shiny dashboard and MCP server (`stdio` + `HTTP` variants).
 
-| Компонент | Технология | Версия |
-|-----------|-----------|--------|
-| Язык | R | 4.5.3 |
-| RSS-агрегатор | TT-RSS | latest |
-| Колоночная БД | ClickHouse | 24.x |
-| Дашборд | Shiny + shinydashboard | CRAN |
-| Визуализация | plotly | CRAN |
-| Тематическое моделирование | topicmodels (LDA), tidytext, YandexGPT | CRAN / Yandex Cloud |
-| MCP-протокол | JSON-RPC 2.0 stdio | — |
-| Контейнеры | Docker Compose | — |
-| Хостинг кода | GitHub | — |
+## High-Level Architecture
 
----
+1. TT-RSS aggregates RSS feeds.
+2. `ttrssR` fetches and normalizes full article content.
+3. Articles are classified by one of supported ML backends.
+4. Results are persisted in ClickHouse.
+5. Users and agents consume data via Shiny and MCP.
 
-## Этап 1 — Выбор ниши и RSS-источники
+## Tech Stack
 
-**Ниша:** APT / Threat Intelligence (атаки и угрозы в кибербезопасности).
+| Layer | Technology |
+|---|---|
+| Core language | R (package-based architecture) |
+| RSS ingestion | TT-RSS JSON API |
+| ML / NLP | `topicmodels`, `tidytext`, optional LLM backends |
+| DB | ClickHouse |
+| Dashboard | Shiny + shinydashboard + plotly + DT |
+| Agent interface | MCP (JSON-RPC 2.0) |
+| Runtime | Docker Compose |
 
-Настроены 16 RSS-лент в 4 категориях (`data-raw/add_security_feeds.R`):
+## Repository Structure
 
-| Категория | Источники |
-|-----------|-----------|
-| Threat Research | Mandiant Blog, Securelist, Unit42, ESET WeLiveSecurity, Recorded Future |
-| Attack News EN | BleepingComputer, The Hacker News, Krebs on Security, Dark Reading |
-| CERT / Gov | US-CERT Alerts, CISA Advisories |
-| APT / RU | BI.ZONE Blog, Positive Technologies, PT Expert Security Center, Kaspersky Threats |
-
-Скрипт использует TT-RSS JSON API: логин → `subscribeToFeed` → `updateFeed` → проверка.
-
----
-
-## Этап 2 — Сбор статей (R-пакет ttrssR)
-
-Пакет `ttrssR` предоставляет функции:
-
-```r
-library(ttrssR)
-
-# Авторизация
-sid <- ttrss_login(host, user, password)
-
-# Получение заголовков по категории
-articles <- ttrss_get_headlines(sid, cat_id = -4, limit = 1000)
-
-# Полный текст статей
-full <- ttrss_get_article(sid, article_ids)
-```
-
-Результат — `data.frame` с полями: `article_id`, `title`, `content`, `content_text`, `link`, `feed_title`, `published_at`, `is_unread`, `is_starred`.
-
-Собрано **340 статей** от 16 источников, сохранено в `data/news_raw.rds`.
-
----
-
-## Этап 3 — Тематическое моделирование (LDA)
-
-Файл: `R/classify.R` (функция `classify_news()`)
-
-Алгоритм:
-1. Токенизация заголовков + текстов (`tidytext::unnest_tokens`)
-2. Удаление стоп-слов (английский + русский)
-3. Построение матрицы документ-термин (`cast_dtm`)
-4. LDA с **8 темами** (`topicmodels::LDA(k=8, method="Gibbs")`)
-5. Присвоение каждой статье доминирующей темы (`topic_label`)
-
-Полученные темы:
-- Ransomware & Extortion
-- APT Campaigns
-- Vulnerability & Patch
-- Data Breach
-- Malware Analysis
-- Phishing & Social Engineering
-- CERT / Government Alerts
-- Threat Intelligence
-
-Результат записывается обратно в `data/news_raw.rds` с добавленными колонками `topic`, `topic_label`, `topic_prob`.
-
-Дополнительно в `R/classify.R` реализованы альтернативные методы:
-- `method = "kmeans"` — кластеризация TF-IDF;
-- `method = "llm"` — классификация через Anthropic API;
-- `method = "yandex_llm"` — классификация через Yandex Cloud Assistant API (`gpt://<folder>/<model>`).
-
-Для `yandex_llm` добавлены практические улучшения:
-- retry с exponential backoff для HTTP 429/5xx;
-- session-cache ответов для повторяющихся текстов;
-- persistent cache в `data/yandex_llm_cache.rds` между запусками;
-- fallback в категорию `"Без категории"` при сетевой/API ошибке.
-
----
-
-## Этап 4 — Хранение в ClickHouse
-
-Файл: `R/db.R` — все функции для работы с ClickHouse.
-
-### Схема таблицы
-
-```sql
-CREATE TABLE IF NOT EXISTS articles (
-    article_id   UInt32,
-    title        String,
-    content      String,
-    content_text String,
-    link         String,
-    feed_title   String,
-    author       String,
-    published_at DateTime,
-    is_unread    UInt8 DEFAULT 0,
-    is_starred   UInt8 DEFAULT 0,
-    feed_id      UInt32 DEFAULT 0,
-    topic        UInt32 DEFAULT 0,
-    topic_label  String DEFAULT '',
-    topic_prob   Float32 DEFAULT 0.0
-)
-ENGINE = ReplacingMergeTree(article_id)
-ORDER BY article_id;
-```
-
-### Ключевые функции
-
-```r
-con <- ch_connect(host, port, dbname, user, password)
-ch_init_schema(con)          # Создание таблицы
-ch_write_articles(con, df)   # Запись статей
-ch_read_articles(con, where, limit)   # Чтение с фильтром
-ch_topic_summary(con)        # Статистика по темам
-```
-
-### Загрузка данных
-
-```r
-# data-raw/_load_to_clickhouse.R
-df <- readRDS("data/news_raw.rds")
-# NA → 0 для числовых, NA → "" для строк
-ch_write_articles(con, df)
-```
-
----
-
-## Этап 5 — Shiny-дашборд
-
-Файлы: `inst/shiny/ui.R`, `inst/shiny/server.R`
-
-### Структура дашборда (4 вкладки)
-
-| Вкладка | Содержимое |
-|---------|-----------|
-| Обзор | Value boxes (всего статей, тем, источников), график по дням, топ-10 тем (бар), доля источников (pie) |
-| Статьи | Фильтруемая таблица с поиском и фильтром по теме |
-| Источники | Таблица: источник → количество статей |
-| Настройки | Кнопка обновления из ClickHouse |
-
-### Ключевое решение: загрузка данных вне reactive-контекста
-
-```r
-# Загружаем данные ДО создания server-функции
-.initial_df <- local({
-  rds <- Find(file.exists, c("data/news_raw.rds",
-              "/srv/shiny-server/ttrss/shiny/data/news_raw.rds"))
-  if (!is.null(rds)) tryCatch(readRDS(rds), error = function(e) NULL)
-})
-
-server <- function(input, output, session) {
-  rv <- reactiveValues(df = .initial_df)
-  # ...
-}
-```
-
-Это устранило проблему пустого дашборда: данные доступны сразу при запуске без ожидания асинхронного `observe()`.
-
----
-
-## Этап 6 — Docker Compose
-
-Файл: `docker-compose.yml`
-
-```yaml
-services:
-  clickhouse:     # ClickHouse :9000/:8123
-  ttrss-db:       # PostgreSQL для TT-RSS
-  ttrss:          # TT-RSS :8280
-  shiny:          # Shiny-дашборд :3838
-  mcp:            # HTTP MCP-сервер (plumber) :8000
-```
-
-### Важные зависимости в Dockerfile (Shiny)
-
-```dockerfile
-RUN apt-get install -y \
-    libsodium-dev \    # нужен для plumber/sodium
-    libssl-dev \
-    libcurl4-openssl-dev
-```
-
-### Решение проблемы кеша Docker BuildKit
-
-При сломанном слое, который BuildKit кешировал, помогает `ARG CACHE_BUST`:
-
-```dockerfile
-ARG CACHE_BUST=4
-RUN echo "cache bust: $CACHE_BUST" && \
-    Rscript -e "install.packages(c('plumber','jsonlite',...))"
-```
-
-Изменение значения `CACHE_BUST` принудительно пересобирает слой.
-
----
-
-## Этап 7 — MCP-сервер для Claude Code
-
-### Транспорт: stdio (JSON-RPC 2.0)
-
-Файл: `inst/mcp/stdio_server.R`
-
-Claude Code запускает Rscript как дочерний процесс и общается через stdin/stdout. Каждое сообщение — JSON-строка, завершённая `\n`.
-
-```r
-con_in <- file("stdin", "r")
-repeat {
-  line <- readLines(con_in, n = 1L, warn = FALSE)
-  if (is.null(line) || length(line) == 0) break
-  msg  <- fromJSON(line, simplifyVector = FALSE)
-  resp <- .handle(msg$method, msg$params, msg$id)
-  if (!is.null(resp)) {
-    cat(toJSON(resp, auto_unbox = TRUE), "\n", sep = "")
-    flush(stdout())
-  }
-}
-```
-
-### Доступные инструменты (tools)
-
-| Инструмент | Описание | Параметры |
-|-----------|---------|-----------|
-| `search_articles` | Поиск по ключевому слову | `query` (обяз.), `topic`, `limit` |
-| `get_topic_summary` | Статистика по темам | `top_n` |
-| `get_recent_articles` | Последние N статей | `topic`, `limit` |
-| `get_feed_stats` | Статистика по источникам | — |
-
-### Конфигурация в Claude Code
-
-```json
-{
-  "mcpServers": {
-    "ttrssR": {
-      "command": "C:\\Program Files\\R\\R-4.5.3\\bin\\Rscript.exe",
-      "args": ["D:\\prpject_R\\ttrssR\\inst\\mcp\\stdio_server.R"],
-      "env": {
-        "CH_HOST": "localhost",
-        "CH_PORT": "9000",
-        "CH_DB": "ttrss",
-        "CH_USER": "default",
-        "CH_PASSWORD": ""
-      }
-    }
-  }
-}
-```
-
-Добавить через CLI: `claude mcp add ttrssR ...`
-
----
-
-## Этап 8 — Структура пакета
-
-```
-ttrssR/
+```text
+news-ai-aggregator/
 ├── R/
-│   ├── db.R              # ClickHouse: connect, read, write, schema
-│   ├── api.R             # TT-RSS JSON API: login, headlines, articles
-│   ├── etl.R             # ETL: сбор и нормализация статей
-│   ├── classify.R        # ML: LDA / KMeans / LLM-классификация
-│   └── app.R             # Запуск Shiny и MCP
+│   ├── api.R                         # TT-RSS API client
+│   ├── etl.R                         # data fetch + normalization
+│   ├── classify.R                    # lda/kmeans/llm/yandex_llm + quality metrics
+│   ├── ground_truth.R                # canonical mapping + supervised evaluation
+│   ├── db.R                          # ClickHouse layer
+│   └── app.R                         # run_dashboard() / run_mcp_server()
 ├── inst/
-│   ├── shiny/
-│   │   ├── ui.R          # Shiny UI (shinydashboard)
-│   │   └── server.R      # Shiny Server (реактивная логика)
-│   └── mcp/
-│       ├── stdio_server.R  # MCP stdio транспорт (для Claude Code)
-│       └── server.R        # MCP HTTP транспорт (plumber, для Docker)
+│   ├── shiny/                        # dashboard app
+│   └── mcp/                          # MCP servers (stdio + HTTP)
 ├── data-raw/
-│   ├── add_security_feeds.R    # Добавление RSS-лент в TT-RSS
-│   ├── fetch_news.R            # Сбор + классификация + сохранение
-│   ├── compare_methods.R       # Сравнение LDA/KMeans/YandexLLM
-│   ├── mini_ground_truth_workflow.R   # Мини-разметка и supervised-оценка
+│   ├── add_security_feeds.R
+│   ├── replace_feeds_ru.R
+│   ├── fetch_news.R
+│   ├── compare_methods.R
+│   ├── mini_ground_truth_workflow.R
 │   └── canonical_topic_mapping_template.csv
-├── data/
-│   └── news_raw.rds      # Собранные и классифицированные статьи
-├── docker-compose.yml
-├── Dockerfile            # Shiny-образ
-├── DESCRIPTION
+├── tests/testthat/
+│   ├── test-api.R
+│   ├── test-etl.R
+│   ├── test-classify.R
+│   └── test-ground-truth.R
+├── docker-compose.yml                # analytics stack (ClickHouse + Shiny + MCP)
+├── docker/ttrss/docker-compose.yml   # standalone TT-RSS stack
 └── README.md
 ```
 
----
+## Quick Start
 
-## Быстрый старт
-
-### Предварительные требования
+### Prerequisites
 
 - Docker Desktop
-- R 4.5.x
-- Claude Code CLI
+- R (4.5+ recommended)
 
-### 1. Запуск стека
+### 1) Start TT-RSS
 
 ```bash
-# Запустить TT-RSS (отдельный compose)
 docker compose -f docker/ttrss/docker-compose.yml up -d
+```
 
-# Запустить аналитический стек (ClickHouse + Shiny + MCP)
+TT-RSS URL: `http://localhost:8080`
+
+### 2) Start analytics stack
+
+```bash
 docker compose up -d --build
 ```
 
-Сервисы:
-- TT-RSS: http://localhost:8080 (admin / password)
-- Shiny: http://localhost:3838/ttrss
-- MCP: http://localhost:8000/mcp
-- ClickHouse HTTP: http://localhost:8123
+Services:
 
-### 2. Добавление RSS-лент
+- Shiny: `http://localhost:3838/ttrss`
+- MCP: `http://localhost:8000/mcp`
+- ClickHouse HTTP: `http://localhost:8123`
 
-```r
-source("data-raw/add_security_feeds.R")
-```
-
-### 3. Сбор и классификация статей
-
-```r
-library(ttrssR)
-# Сбор статей из TT-RSS
-df <- fetch_news_dataframe(
-  base_url = "http://localhost:8080",
-  user = "admin",
-  password = "password",
-  max_articles = 500
-)
-# Классификация (LDA / kmeans / llm / yandex_llm)
-df <- classify_news(df, n_topics = 8, method = "lda")
-saveRDS(df, "data/news_raw.rds")
-```
-
-Пример для YandexGPT:
-
-```r
-Sys.setenv(
-  YANDEX_CLOUD_FOLDER = "<folder_id>",
-  YANDEX_CLOUD_API_KEY = "<api_key>",
-  YANDEX_CLOUD_MODEL = "yandexgpt-lite/rc"
-)
-
-df <- classify_news(df, method = "yandex_llm")
-```
-
-Оценка качества тем:
-
-```r
-# После любой классификации (LDA/KMeans/LLM)
-metrics <- evaluate_topic_quality(df)
-print(metrics$label_coverage)
-print(metrics$topic_distinctiveness)
-print(metrics$per_topic)
-
-# Либо сразу через classify_news:
-df <- classify_news(df, method = "lda", compute_quality = TRUE)
-attr(df, "topic_quality")
-```
-
-### 4. Автоматизированный сценарий (рекомендуется)
+### 3) Ingest + classify news
 
 ```r
 source("data-raw/fetch_news.R")
 ```
 
-### 4.1 Сравнение методов классификации
+### 4) Open dashboard
+
+Open `http://localhost:3838/ttrss`.
+
+## ML Stage: Current Status
+
+### Supported methods
+
+- `lda`: topic modeling (`topicmodels::LDA`).
+- `kmeans`: TF-IDF clustering baseline.
+- `llm`: generic LLM tagging backend.
+- `yandex_llm`: Yandex Assistant API (`gpt://<folder>/<model>`).
+
+### Yandex LLM reliability improvements
+
+- retry with exponential backoff on `429/5xx`;
+- session cache for repeated texts;
+- persistent cache (`data/yandex_llm_cache.rds`) across runs;
+- safe fallback to `"Без категории"` on request failures.
+
+### Unsupervised quality metrics
+
+`evaluate_topic_quality()` returns:
+
+- `label_coverage`;
+- `dominant_topic_share`;
+- `topic_balance_entropy`;
+- `topic_distinctiveness`;
+- per-topic distribution (`per_topic`).
+
+Example:
+
+```r
+df <- classify_news(df, method = "lda", compute_quality = TRUE)
+attr(df, "topic_quality")
+```
+
+## Method Benchmarking
+
+Run unified benchmark on one dataset:
 
 ```r
 source("data-raw/compare_methods.R")
 ```
 
-Скрипт запускает `lda`, `kmeans` и (если заданы Yandex env) `yandex_llm` на одном датасете
-и сохраняет метрики качества в:
+Outputs:
+
 - `data/method_comparison.csv`
 - `data/method_comparison.rds`
 
-### 4.2 Mini ground-truth + canonical mapping
+## Mini Ground-Truth + Canonical Mapping
+
+This workflow gives presentation-grade supervised evidence (`accuracy`, `macro_f1`, confusion matrix).
+
+Run:
 
 ```r
 source("data-raw/mini_ground_truth_workflow.R")
 ```
 
-Сценарий работает в 2 прохода:
-1. Формирует шаблон ручной разметки `data/ground_truth_template.csv` (колонка `topic_true`).
-2. После заполнения и сохранения как `data/ground_truth_labeled.csv` считает supervised-метрики:
-   - `accuracy`
-   - `macro_f1`
-   - per-class precision/recall/F1
+### Workflow
 
-Файлы, которые используются:
-- `data-raw/canonical_topic_mapping_template.csv` — шаблон маппинга `raw_label -> canonical_label`
-- `data/ground_truth_metrics.csv` — краткая сводка метрик
-- `data/ground_truth_metrics.rds` — полный отчёт с confusion matrix
+1. Script creates `data/ground_truth_template.csv`.
+2. Manually fill `topic_true`.
+3. Save as `data/ground_truth_labeled.csv`.
+4. Re-run script to compute metrics.
 
-Также доступны функции пакета:
+### Files
+
+- Mapping template: `data-raw/canonical_topic_mapping_template.csv`
+- Metrics summary: `data/ground_truth_metrics.csv`
+- Full metrics report: `data/ground_truth_metrics.rds`
+
+### Reusable functions
+
 - `create_ground_truth_sample()`
 - `apply_canonical_label_mapping()`
 - `evaluate_against_ground_truth()`
 
-### 5. Открыть дашборд
+## Environment Variables
 
-Перейти на http://localhost:3838/ttrss
+Common:
 
-### 6. Подключить MCP к Claude Code
+- `TTRSS_URL`, `TTRSS_USER`, `TTRSS_PASSWORD`
+- `CH_HOST`, `CH_PORT`, `CH_DB`, `CH_USER`, `CH_PASSWORD`
+- `CLASSIFY_METHOD`, `N_TOPICS`, `MAX_ARTICLES`
 
-```bash
-claude mcp add ttrssR \
-  "C:\Program Files\R\R-4.5.3\bin\Rscript.exe" \
-  "D:\path\to\news-ai-aggregator\inst\mcp\stdio_server.R" \
-  --env CH_HOST=localhost --env CH_PORT=9000 \
-  --env CH_DB=ttrss --env CH_USER=default --env CH_PASSWORD=
+Yandex LLM:
+
+- `YANDEX_CLOUD_API_KEY`
+- `YANDEX_CLOUD_FOLDER`
+- `YANDEX_CLOUD_MODEL` (default `yandexgpt-lite/rc`)
+- `YANDEX_CLOUD_BASE_URL` (default `https://rest-assistant.api.cloud.yandex.net/v1`)
+- `YANDEX_CACHE_PATH` (optional cache file override)
+
+## MCP Integration
+
+The project provides:
+
+- `inst/mcp/stdio_server.R` for local agent integration via stdin/stdout.
+- `inst/mcp/server.R` for HTTP transport in Docker.
+
+Current toolset includes:
+
+- `search_articles`
+- `get_topic_summary`
+- `get_recent_articles`
+- `get_feed_stats`
+
+## Testing
+
+Tests are organized in `tests/testthat`:
+
+- API client coverage (`test-api.R`)
+- ETL and normalization (`test-etl.R`)
+- classification and quality logic (`test-classify.R`)
+- ground-truth/canonical mapping evaluation (`test-ground-truth.R`)
+
+Run tests (locally with R installed):
+
+```r
+testthat::test_dir("tests/testthat")
 ```
 
-После этого Claude Code может использовать инструменты `ttrssR` для анализа данных.
-
----
-
-## Решённые технические проблемы
-
-| Проблема | Причина | Решение |
-|---------|--------|---------|
-| `plumber` не устанавливается в Docker | Нет `libsodium-dev` в apt | Добавить `libsodium-dev` в Dockerfile |
-| Docker кешировал сломанный слой | BuildKit сохранил слой с тихой ошибкой | `ARG CACHE_BUST=N` перед RUN |
-| Shiny показывает пустой дашборд | Данные грузились в `observe()` асинхронно | Загрузка в `local({})` вне server-функции |
-| MCP отвечает 405 на GET /mcp | plumber ожидал только POST | Переход на stdio-транспорт |
-| `ttrssR` не ставится в MCP-контейнер | Зависимости shiny/ggplot2/plotly не нужны | `source("R/db.R")` вместо `library(ttrssR)` |
-| NA в ClickHouse (UInt32, Float32) | RDS содержал NA в числовых колонках | Замена NA→0 для числовых, NA→"" для строк |
-| `claude mcp list` не видит сервер | Claude Code читает `~/.claude.json`, не `settings.json` | Использовать `claude mcp add` команду |
-
----
-
-## Репозиторий
+## Repository
 
 https://github.com/AlexeyPetrov1/news-ai-aggregator
