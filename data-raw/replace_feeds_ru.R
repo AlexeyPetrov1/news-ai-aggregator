@@ -43,10 +43,26 @@ sid <- ttrss_login(TTRSS_URL, TTRSS_USER, TTRSS_PASS)
 # ── Шаг 1: удалить все текущие фиды ──────────────────────────────────────────
 
 cat("\n=== Шаг 1: Удаление текущих фидов ===\n")
-existing <- ttrss_get_feeds(TTRSS_URL, sid)
 
-if (nrow(existing) > 0 && "id" %in% names(existing)) {
-  feed_ids <- as.integer(existing$id[existing$id > 0])
+# cat_id=-1 возвращает только виртуальные фиды — собираем реальные через cat_id=0 + все категории
+cats    <- ttrss_get_categories(TTRSS_URL, sid)
+cat_ids <- 0L
+if (nrow(cats) > 0 && "id" %in% names(cats)) {
+  real_cat_ids <- as.integer(cats$id)
+  cat_ids      <- unique(c(0L, real_cat_ids[real_cat_ids > 0]))
+}
+
+all_feeds <- dplyr::bind_rows(lapply(cat_ids, function(cid) {
+  tryCatch(ttrss_get_feeds(TTRSS_URL, sid, cat_id = cid), error = function(e) data.frame())
+}))
+
+feed_ids <- integer(0)
+if (nrow(all_feeds) > 0 && "id" %in% names(all_feeds)) {
+  feed_ids <- unique(as.integer(all_feeds$id))
+  feed_ids <- feed_ids[feed_ids > 0]
+}
+
+if (length(feed_ids) > 0) {
   for (fid in feed_ids) {
     tryCatch({
       ttrss_unsubscribe_feed(TTRSS_URL, sid, fid)
@@ -58,7 +74,7 @@ if (nrow(existing) > 0 && "id" %in% names(existing)) {
   }
   cat(sprintf("Удалено: %d фидов\n", length(feed_ids)))
 } else {
-  cat("Фидов не найдено.\n")
+  cat("Реальных фидов не найдено.\n")
 }
 
 # ── Шаг 2: подписаться на русские источники ───────────────────────────────────
