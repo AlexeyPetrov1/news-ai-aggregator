@@ -106,7 +106,7 @@ Open `http://localhost:3838/ttrss`.
 
 - `lda`: topic modeling (`topicmodels::LDA`).
 - `kmeans`: TF-IDF clustering baseline.
-- `llm`: LLM tagging (Anthropic-compatible API).
+- `llm`: generic LLM tagging backend.
 - `yandex_llm`: Yandex Assistant API (`gpt://<folder>/<model>`).
 
 ### Yandex LLM reliability improvements
@@ -191,7 +191,7 @@ Yandex LLM:
 - `YANDEX_CLOUD_BASE_URL` (default `https://rest-assistant.api.cloud.yandex.net/v1`)
 - `YANDEX_CACHE_PATH` (optional cache file override)
 
-## MCP Integration (Claude Code)
+## MCP Integration
 
 The project provides:
 
