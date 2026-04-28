@@ -3,9 +3,9 @@ library(dplyr)
 library(ggplot2)
 library(plotly)
 library(DT)
+library(tidytext)
 library(ttrssR)
 
-# Загружаем данные один раз при старте (вне реактивного контекста)
 .initial_df <- local({
   candidates <- c(
     "data/news_raw.rds",
@@ -22,6 +22,10 @@ library(ttrssR)
 })
 if (!is.null(.initial_df)) message("[APP] Ready: ", nrow(.initial_df), " rows")
 
+.stopwords_ru_en <- dplyr::bind_rows(
+  lapply(c("ru", "en"), tidytext::get_stopwords)
+)
+
 server <- function(input, output, session) {
 
   rv <- reactiveValues(
@@ -34,7 +38,6 @@ server <- function(input, output, session) {
     rv$log <- c(rv$log, msg)
   }
 
-  # Обновляем селекторы когда данные появились
   observe({
     df <- rv$df
     req(df)
@@ -44,7 +47,6 @@ server <- function(input, output, session) {
     updateSelectInput(session, "art_feed",  choices = feeds,  selected = "Все")
   })
 
-  # Кнопка сбросить фильтры
   observeEvent(input$btn_refresh, {
     df <- rv$df
     req(df)
@@ -54,7 +56,6 @@ server <- function(input, output, session) {
     updateSelectInput(session, "art_feed",  choices = feeds,  selected = "Все")
   })
 
-  # Кнопка: собрать новости
   observeEvent(input$btn_fetch, {
     .log("Запуск сбора…")
     withProgress(message = "Сбор новостей…", {
@@ -71,7 +72,6 @@ server <- function(input, output, session) {
     })
   })
 
-  # Кнопка: классифицировать
   observeEvent(input$btn_classify, {
     req(rv$df)
     .log("Классификация (", input$cfg_method, ")…")
@@ -84,7 +84,6 @@ server <- function(input, output, session) {
     })
   })
 
-  # Фильтрованные данные
   filtered_df <- reactive({
     df <- rv$df
     req(df)
@@ -126,22 +125,6 @@ server <- function(input, output, session) {
   })
 
   # ── Графики ───────────────────────────────────────────────────────────────
-  output$plot_timeline <- renderPlotly({
-    df <- rv$df
-    req(df, nrow(df) > 0)
-    daily <- df |>
-      mutate(date = as.Date(as.character(published_at))) |>
-      filter(!is.na(date)) |>
-      count(date) |>
-      arrange(date)
-    req(nrow(daily) > 0)
-    plot_ly(daily, x = ~date, y = ~n, type = "bar",
-            marker = list(color = "#3c8dbc")) |>
-      layout(xaxis = list(title = ""),
-             yaxis = list(title = "Статей"),
-             margin = list(l = 50, r = 20, t = 10, b = 50))
-  })
-
   output$plot_topics <- renderPlotly({
     df <- rv$df
     req(df, "topic_label" %in% names(df))
@@ -176,6 +159,54 @@ server <- function(input, output, session) {
       layout(xaxis = list(title = "", tickangle = -35),
              yaxis = list(title = "Статей"),
              margin = list(l = 40, r = 20, t = 10, b = 130))
+  })
+
+  output$plot_keywords <- renderPlotly({
+    df <- rv$df
+    req(df)
+    text_col <- intersect(c("content_text", "title"), names(df))[1]
+    req(!is.na(text_col))
+
+    top_words <- df |>
+      tidytext::unnest_tokens(word, !!sym(text_col)) |>
+      filter(nchar(word) > 3L, !grepl("^[0-9]+$", word)) |>
+      anti_join(.stopwords_ru_en, by = "word") |>
+      count(word, sort = TRUE) |>
+      slice_head(n = 20L)
+
+    req(nrow(top_words) > 0)
+    plot_ly(top_words,
+            x = ~n,
+            y = ~reorder(word, n),
+            type = "bar", orientation = "h",
+            marker = list(color = "#605ca8")) |>
+      layout(xaxis = list(title = "Упоминаний"),
+             yaxis = list(title = ""),
+             margin = list(l = 130, r = 20, t = 10, b = 40))
+  })
+
+  output$plot_weekday <- renderPlotly({
+    df <- rv$df
+    req(df, "published_at" %in% names(df))
+
+    weekday_labels <- c("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
+
+    wd <- df |>
+      mutate(date = as.Date(as.character(published_at))) |>
+      filter(!is.na(date)) |>
+      mutate(wday = lubridate::wday(date, week_start = 1L)) |>
+      count(wday) |>
+      mutate(label = weekday_labels[wday])
+
+    req(nrow(wd) > 0)
+    plot_ly(wd,
+            x = ~factor(label, levels = weekday_labels),
+            y = ~n,
+            type = "bar",
+            marker = list(color = "#00c0ef")) |>
+      layout(xaxis = list(title = ""),
+             yaxis = list(title = "Статей"),
+             margin = list(l = 50, r = 20, t = 10, b = 40))
   })
 
   # ── Таблицы ───────────────────────────────────────────────────────────────

@@ -85,8 +85,10 @@ classify_news <- function(df,
   labels_df <- tidytext::tidy(lda, matrix = "beta") |>
     dplyr::group_by(topic) |>
     dplyr::slice_max(beta, n = 5L, with_ties = FALSE) |>
-    dplyr::summarise(topic_label = paste(term, collapse = ", "),
-                     .groups = "drop")
+    dplyr::summarise(
+      topic_label = paste0("Тема ", topic[1], ": ", paste(term, collapse = ", ")),
+      .groups = "drop"
+    )
 
   gamma_df <- dplyr::left_join(gamma_df, labels_df, by = "topic")
 
@@ -135,7 +137,7 @@ classify_news <- function(df,
   cluster_df <- data.frame(
     doc_id      = as.character(ids),
     topic       = km$cluster,
-    topic_label = paste0("Кластер ", km$cluster),
+    topic_label = paste0("Тема ", km$cluster),
     stringsAsFactors = FALSE
   )
 
