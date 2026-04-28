@@ -22,6 +22,13 @@
 #' @param yandex_model Yandex model name without folder prefix
 #'   (e.g. \code{"yandexgpt-lite/rc"}).
 #' @param yandex_base_url Base URL for Yandex Assistant API.
+#' @param yandex_max_retries Maximum retry attempts for transient
+#'   Yandex API failures (HTTP 429/5xx).
+#' @param yandex_retry_base_sec Base delay in seconds for exponential backoff.
+#' @param use_yandex_cache If \code{TRUE}, caches Yandex responses for repeated
+#'   texts within the same R session.
+#' @param compute_quality If \code{TRUE}, computes quality metrics and stores
+#'   them in \code{attr(result, "topic_quality")}.
 #' @param language  Stopword language passed to \code{tidytext::get_stopwords()}.
 #'   Use \code{c("ru", "en")} for bilingual corpora (default).
 #' @return The original data frame with additional columns:
@@ -37,6 +44,10 @@ classify_news <- function(df,
                           yandex_folder_id = NULL,
                           yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-lite/rc"),
                           yandex_base_url = Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://rest-assistant.api.cloud.yandex.net/v1"),
+                          yandex_max_retries = 3L,
+                          yandex_retry_base_sec = 1,
+                          use_yandex_cache = TRUE,
+                          compute_quality = FALSE,
                           language      = c("ru", "en")) {
 
   method <- match.arg(method)
@@ -56,9 +67,16 @@ classify_news <- function(df,
       api_key = yandex_api_key,
       folder_id = yandex_folder_id,
       model = yandex_model,
-      base_url = yandex_base_url
+      base_url = yandex_base_url,
+      max_retries = yandex_max_retries,
+      retry_base_sec = yandex_retry_base_sec,
+      use_cache = use_yandex_cache
     )
   )
+
+  if (isTRUE(compute_quality)) {
+    attr(result, "topic_quality") <- evaluate_topic_quality(result)
+  }
 
   cli::cli_inform("Classification complete.")
   result
@@ -216,7 +234,12 @@ classify_news <- function(df,
 
 # ── Yandex LLM ────────────────────────────────────────────────────────────────
 
-.classify_yandex_llm <- function(df, api_key, folder_id, model, base_url) {
+.yandex_cache <- new.env(parent = emptyenv())
+
+.classify_yandex_llm <- function(df, api_key, folder_id, model, base_url,
+                                 max_retries = 3L,
+                                 retry_base_sec = 1,
+                                 use_cache = TRUE) {
   api_key <- api_key %||% Sys.getenv("YANDEX_CLOUD_API_KEY", "")
   folder_id <- folder_id %||% Sys.getenv("YANDEX_CLOUD_FOLDER", "")
 
@@ -247,6 +270,11 @@ classify_news <- function(df,
       max_output_tokens = 60L
     )
 
+    cache_key <- .yandex_cache_key(model_uri, text)
+    if (isTRUE(use_cache) && exists(cache_key, envir = .yandex_cache, inherits = FALSE)) {
+      return(get(cache_key, envir = .yandex_cache, inherits = FALSE))
+    }
+
     req <- httr2::request(endpoint) |>
       httr2::req_headers(
         "Authorization" = paste("Bearer", api_key),
@@ -255,17 +283,48 @@ classify_news <- function(df,
       httr2::req_body_json(body) |>
       httr2::req_error(is_error = \(r) FALSE)
 
-    resp <- tryCatch(httr2::req_perform(req), error = function(e) NULL)
-    if (is.null(resp) || httr2::resp_is_error(resp)) return("Без категории")
+    label <- "Без категории"
+    attempts <- max(1L, as.integer(max_retries))
+    for (attempt in seq_len(attempts)) {
+      resp <- tryCatch(httr2::req_perform(req), error = function(e) NULL)
+      if (is.null(resp)) {
+        if (attempt < attempts) {
+          Sys.sleep(retry_base_sec * (2 ^ (attempt - 1L)))
+          next
+        }
+        break
+      }
 
-    parsed <- httr2::resp_body_json(resp, simplifyVector = FALSE)
-    txt <- .extract_response_output_text(parsed)
-    trimws(txt %||% "Без категории")
+      status <- httr2::resp_status(resp)
+      should_retry <- status == 429L || status >= 500L
+      if (httr2::resp_is_error(resp) && should_retry && attempt < attempts) {
+        Sys.sleep(retry_base_sec * (2 ^ (attempt - 1L)))
+        next
+      }
+      if (httr2::resp_is_error(resp)) break
+
+      parsed <- httr2::resp_body_json(resp, simplifyVector = FALSE)
+      txt <- .extract_response_output_text(parsed)
+      label <- trimws(txt %||% "Без категории")
+      break
+    }
+
+    if (isTRUE(use_cache)) {
+      assign(cache_key, label, envir = .yandex_cache)
+    }
+    label
   }, character(1L))
 
   df$topic_label <- labels
   df$topic       <- as.integer(factor(labels))
   df
+}
+
+.yandex_cache_key <- function(model_uri, text) {
+  txt <- text %||% ""
+  head_part <- substring(txt, 1L, min(200L, nchar(txt)))
+  tail_part <- substring(txt, max(1L, nchar(txt) - 199L), nchar(txt))
+  paste(model_uri, nchar(txt), head_part, tail_part, sep = "||")
 }
 
 .extract_response_output_text <- function(parsed) {
@@ -283,4 +342,100 @@ classify_news <- function(df,
 
   if (!length(parts)) return(NULL)
   paste(parts[nzchar(parts)], collapse = " ")
+}
+
+#' Evaluate quality of topic labels
+#'
+#' Computes lightweight post-classification quality metrics that can be used
+#' for regression checks and model comparison.
+#'
+#' @param df Classified data frame returned by \code{classify_news()}.
+#' @param text_col Column name with normalized article text.
+#' @param label_col Column name with assigned topic labels.
+#' @param min_token_len Minimum token length for quality tokenization.
+#' @return A named list with summary metrics and per-topic counts.
+#' @export
+evaluate_topic_quality <- function(df,
+                                   text_col = "content_text",
+                                   label_col = "topic_label",
+                                   min_token_len = 4L) {
+  if (!is.data.frame(df) || nrow(df) == 0L) {
+    cli::cli_abort("{.arg df} must be a non-empty data frame.")
+  }
+  if (!text_col %in% names(df)) {
+    cli::cli_abort("Column {.field {text_col}} not found in {.arg df}.")
+  }
+  if (!label_col %in% names(df)) {
+    cli::cli_abort("Column {.field {label_col}} not found in {.arg df}.")
+  }
+
+  labels <- trimws(as.character(df[[label_col]]))
+  labels[is.na(labels)] <- ""
+  n_docs <- nrow(df)
+  n_labeled <- sum(nzchar(labels))
+  topic_counts <- sort(table(labels[nzchar(labels)]), decreasing = TRUE)
+  n_topics <- length(topic_counts)
+
+  coverage <- n_labeled / n_docs
+  p <- if (n_labeled > 0L) as.numeric(topic_counts) / n_labeled else numeric()
+  entropy <- if (length(p)) -sum(p * log(p)) else 0
+  normalized_entropy <- if (n_topics > 1L) entropy / log(n_topics) else 0
+  dominant_topic_share <- if (length(p)) max(p) else 0
+
+  distinctiveness <- .topic_distinctiveness_score(
+    df = df,
+    text_col = text_col,
+    label_col = label_col,
+    min_token_len = min_token_len
+  )
+
+  list(
+    n_documents = n_docs,
+    n_labeled = n_labeled,
+    label_coverage = coverage,
+    n_topics = n_topics,
+    dominant_topic_share = dominant_topic_share,
+    topic_balance_entropy = normalized_entropy,
+    topic_distinctiveness = distinctiveness$score,
+    per_topic = data.frame(
+      topic_label = names(topic_counts),
+      n_articles = as.integer(topic_counts),
+      share = if (n_labeled > 0L) as.numeric(topic_counts) / n_labeled else 0,
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+.topic_distinctiveness_score <- function(df, text_col, label_col, min_token_len = 4L) {
+  work <- df[, c(text_col, label_col), drop = FALSE]
+  names(work) <- c("content_text", "topic_label")
+  work <- work[!is.na(work$topic_label) & nzchar(trimws(work$topic_label)), , drop = FALSE]
+  if (nrow(work) == 0L) return(list(score = 0))
+
+  tokens <- work |>
+    dplyr::mutate(doc_id = seq_len(dplyr::n())) |>
+    tidytext::unnest_tokens(word, content_text) |>
+    dplyr::filter(nchar(word) >= as.integer(min_token_len)) |>
+    dplyr::count(topic_label, word, sort = TRUE)
+
+  if (nrow(tokens) == 0L) return(list(score = 0))
+
+  top_terms <- tokens |>
+    dplyr::group_by(topic_label) |>
+    dplyr::slice_max(n, n = 10L, with_ties = FALSE) |>
+    dplyr::summarise(terms = list(unique(word)), .groups = "drop")
+
+  if (nrow(top_terms) < 2L) return(list(score = 1))
+
+  comb <- utils::combn(seq_len(nrow(top_terms)), 2L)
+  overlaps <- apply(comb, 2L, function(idx) {
+    a <- top_terms$terms[[idx[1L]]]
+    b <- top_terms$terms[[idx[2L]]]
+    inter <- length(intersect(a, b))
+    union <- length(unique(c(a, b)))
+    if (union == 0L) return(0)
+    inter / union
+  })
+
+  list(score = 1 - mean(overlaps))
 }

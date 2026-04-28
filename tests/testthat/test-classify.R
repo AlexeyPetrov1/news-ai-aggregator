@@ -67,3 +67,16 @@ test_that("classify_news yandex_llm errors without folder id", {
     "yandex_folder_id|YANDEX_CLOUD_FOLDER"
   )
 })
+
+test_that("evaluate_topic_quality returns summary metrics", {
+  df <- make_df(12)
+  df$topic_label <- rep(c("APT", "Ransomware", "Phishing"), length.out = 12)
+  metrics <- evaluate_topic_quality(df)
+
+  expect_type(metrics, "list")
+  expect_true("label_coverage" %in% names(metrics))
+  expect_true("topic_distinctiveness" %in% names(metrics))
+  expect_true("per_topic" %in% names(metrics))
+  expect_s3_class(metrics$per_topic, "data.frame")
+  expect_equal(metrics$n_documents, 12)
+})

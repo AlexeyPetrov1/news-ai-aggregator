@@ -111,6 +111,11 @@ full <- ttrss_get_article(sid, article_ids)
 - `method = "llm"` — классификация через Anthropic API;
 - `method = "yandex_llm"` — классификация через Yandex Cloud Assistant API (`gpt://<folder>/<model>`).
 
+Для `yandex_llm` добавлены практические улучшения:
+- retry с exponential backoff для HTTP 429/5xx;
+- session-cache ответов для повторяющихся текстов;
+- fallback в категорию `"Без категории"` при сетевой/API ошибке.
+
 ---
 
 ## Этап 4 — Хранение в ClickHouse
@@ -371,6 +376,20 @@ Sys.setenv(
 )
 
 df <- classify_news(df, method = "yandex_llm")
+```
+
+Оценка качества тем:
+
+```r
+# После любой классификации (LDA/KMeans/LLM)
+metrics <- evaluate_topic_quality(df)
+print(metrics$label_coverage)
+print(metrics$topic_distinctiveness)
+print(metrics$per_topic)
+
+# Либо сразу через classify_news:
+df <- classify_news(df, method = "lda", compute_quality = TRUE)
+attr(df, "topic_quality")
 ```
 
 ### 4. Автоматизированный сценарий (рекомендуется)
