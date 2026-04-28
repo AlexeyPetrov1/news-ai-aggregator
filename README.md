@@ -310,7 +310,10 @@ ttrssR/
 │       └── server.R        # MCP HTTP транспорт (plumber, для Docker)
 ├── data-raw/
 │   ├── add_security_feeds.R    # Добавление RSS-лент в TT-RSS
-│   └── fetch_news.R            # Сбор + классификация + сохранение
+│   ├── fetch_news.R            # Сбор + классификация + сохранение
+│   ├── compare_methods.R       # Сравнение LDA/KMeans/YandexLLM
+│   ├── mini_ground_truth_workflow.R   # Мини-разметка и supervised-оценка
+│   └── canonical_topic_mapping_template.csv
 ├── data/
 │   └── news_raw.rds      # Собранные и классифицированные статьи
 ├── docker-compose.yml
@@ -409,6 +412,29 @@ source("data-raw/compare_methods.R")
 и сохраняет метрики качества в:
 - `data/method_comparison.csv`
 - `data/method_comparison.rds`
+
+### 4.2 Mini ground-truth + canonical mapping
+
+```r
+source("data-raw/mini_ground_truth_workflow.R")
+```
+
+Сценарий работает в 2 прохода:
+1. Формирует шаблон ручной разметки `data/ground_truth_template.csv` (колонка `topic_true`).
+2. После заполнения и сохранения как `data/ground_truth_labeled.csv` считает supervised-метрики:
+   - `accuracy`
+   - `macro_f1`
+   - per-class precision/recall/F1
+
+Файлы, которые используются:
+- `data-raw/canonical_topic_mapping_template.csv` — шаблон маппинга `raw_label -> canonical_label`
+- `data/ground_truth_metrics.csv` — краткая сводка метрик
+- `data/ground_truth_metrics.rds` — полный отчёт с confusion matrix
+
+Также доступны функции пакета:
+- `create_ground_truth_sample()`
+- `apply_canonical_label_mapping()`
+- `evaluate_against_ground_truth()`
 
 ### 5. Открыть дашборд
 
