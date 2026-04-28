@@ -1,51 +1,51 @@
-# ttrssR: Cybersecurity News ML Pipeline
+# ttrssR: ML-пайплайн для анализа новостей по кибербезопасности
 
-`ttrssR` is an R package and service stack for end-to-end cybersecurity news analytics:
+`ttrssR` — R-пакет и сервисный стек для полного цикла аналитики новостей:
 
-RSS ingestion -> normalization -> topic classification -> ClickHouse storage -> Shiny dashboard -> MCP tools for AI agents.
+RSS-сбор -> нормализация -> тематическая классификация -> хранение в ClickHouse -> визуализация в Shiny -> MCP-инструменты для AI-агентов.
 
-## Project Scope
+## Что делает проект
 
-- Domain: threat intelligence, incident news, vulnerability updates, malware and phishing monitoring.
-- Data source: TT-RSS via JSON API.
-- Storage: ClickHouse (analytical queries and summaries).
-- ML: `lda`, `kmeans`, `llm`, `yandex_llm` + quality evaluation.
-- Delivery: Shiny dashboard and MCP server (`stdio` + `HTTP` variants).
+- Тематика: threat intelligence, инциденты, уязвимости, вредоносное ПО, фишинг.
+- Источник данных: TT-RSS (JSON API).
+- Хранилище: ClickHouse.
+- ML: `lda`, `kmeans`, `llm`, `yandex_llm` + метрики качества.
+- Интерфейсы: Shiny-дашборд и MCP-сервер (`stdio` + `HTTP`).
 
-## High-Level Architecture
+## Архитектура
 
-1. TT-RSS aggregates RSS feeds.
-2. `ttrssR` fetches and normalizes full article content.
-3. Articles are classified by one of supported ML backends.
-4. Results are persisted in ClickHouse.
-5. Users and agents consume data via Shiny and MCP.
+1. TT-RSS агрегирует RSS-ленты.
+2. `ttrssR` забирает и нормализует статьи.
+3. Статьи классифицируются выбранным ML-методом.
+4. Результаты пишутся в ClickHouse.
+5. Данные доступны через Shiny и MCP.
 
-## Tech Stack
+## Технологии
 
-| Layer | Technology |
+| Слой | Технология |
 |---|---|
-| Core language | R (package-based architecture) |
-| RSS ingestion | TT-RSS JSON API |
-| ML / NLP | `topicmodels`, `tidytext`, optional LLM backends |
-| DB | ClickHouse |
-| Dashboard | Shiny + shinydashboard + plotly + DT |
-| Agent interface | MCP (JSON-RPC 2.0) |
-| Runtime | Docker Compose |
+| Ядро | R (package-based architecture) |
+| Сбор RSS | TT-RSS JSON API |
+| ML / NLP | `topicmodels`, `tidytext`, LLM-backends |
+| БД | ClickHouse |
+| Визуализация | Shiny + shinydashboard + plotly + DT |
+| Agent API | MCP (JSON-RPC 2.0) |
+| Оркестрация | Docker Compose |
 
-## Repository Structure
+## Структура репозитория
 
 ```text
 news-ai-aggregator/
 ├── R/
-│   ├── api.R                         # TT-RSS API client
-│   ├── etl.R                         # data fetch + normalization
-│   ├── classify.R                    # lda/kmeans/llm/yandex_llm + quality metrics
-│   ├── ground_truth.R                # canonical mapping + supervised evaluation
-│   ├── db.R                          # ClickHouse layer
+│   ├── api.R                         # клиент TT-RSS API
+│   ├── etl.R                         # сбор и нормализация данных
+│   ├── classify.R                    # lda/kmeans/llm/yandex_llm + quality
+│   ├── ground_truth.R                # canonical mapping + supervised metrics
+│   ├── db.R                          # слой ClickHouse
 │   └── app.R                         # run_dashboard() / run_mcp_server()
 ├── inst/
-│   ├── shiny/                        # dashboard app
-│   └── mcp/                          # MCP servers (stdio + HTTP)
+│   ├── shiny/                        # Shiny-приложение
+│   └── mcp/                          # MCP-серверы (stdio + HTTP)
 ├── data-raw/
 │   ├── add_security_feeds.R
 │   ├── replace_feeds_ru.R
@@ -58,168 +58,168 @@ news-ai-aggregator/
 │   ├── test-etl.R
 │   ├── test-classify.R
 │   └── test-ground-truth.R
-├── docker-compose.yml                # analytics stack (ClickHouse + Shiny + MCP)
-├── docker/ttrss/docker-compose.yml   # standalone TT-RSS stack
+├── docker-compose.yml                # аналитический стек (CH + Shiny + MCP)
+├── docker/ttrss/docker-compose.yml   # TT-RSS + PostgreSQL
 └── README.md
 ```
 
-## Quick Start
+## Быстрый старт
 
-### Prerequisites
+### Требования
 
 - Docker Desktop
-- R (4.5+ recommended)
+- R (рекомендуется 4.5+)
 
-### 1) Start TT-RSS
+### 1) Запуск TT-RSS
 
 ```bash
 docker compose -f docker/ttrss/docker-compose.yml up -d
 ```
 
-TT-RSS URL: `http://localhost:8080`
+URL TT-RSS: `http://localhost:8080`
 
-### 2) Start analytics stack
+### 2) Запуск аналитического стека
 
 ```bash
 docker compose up -d --build
 ```
 
-Services:
+Сервисы:
 
 - Shiny: `http://localhost:3838/ttrss`
 - MCP: `http://localhost:8000/mcp`
 - ClickHouse HTTP: `http://localhost:8123`
 
-### 3) Ingest + classify news
+### 3) Сбор и классификация статей
 
 ```r
 source("data-raw/fetch_news.R")
 ```
 
-### 4) Open dashboard
+### 4) Открыть дашборд
 
-Open `http://localhost:3838/ttrss`.
+Открой `http://localhost:3838/ttrss`.
 
-## ML Stage: Current Status
+## ML-этап: текущее состояние
 
-### Supported methods
+### Поддерживаемые методы
 
-- `lda`: topic modeling (`topicmodels::LDA`).
-- `kmeans`: TF-IDF clustering baseline.
-- `llm`: generic LLM tagging backend.
+- `lda`: тематическое моделирование (`topicmodels::LDA`);
+- `kmeans`: baseline-кластеризация по TF-IDF;
+- `llm`: универсальный backend для LLM-тегирования;
 - `yandex_llm`: Yandex Assistant API (`gpt://<folder>/<model>`).
 
-### Yandex LLM reliability improvements
+### Улучшения для `yandex_llm`
 
-- retry with exponential backoff on `429/5xx`;
-- session cache for repeated texts;
-- persistent cache (`data/yandex_llm_cache.rds`) across runs;
-- safe fallback to `"Без категории"` on request failures.
+- retry + exponential backoff на `429/5xx`;
+- session-cache для повторяющихся текстов;
+- persistent cache (`data/yandex_llm_cache.rds`) между запусками;
+- fallback в `"Без категории"` при сбоях API.
 
-### Unsupervised quality metrics
+### Ненадзорные метрики качества
 
-`evaluate_topic_quality()` returns:
+`evaluate_topic_quality()` возвращает:
 
 - `label_coverage`;
 - `dominant_topic_share`;
 - `topic_balance_entropy`;
 - `topic_distinctiveness`;
-- per-topic distribution (`per_topic`).
+- распределение по темам (`per_topic`).
 
-Example:
+Пример:
 
 ```r
 df <- classify_news(df, method = "lda", compute_quality = TRUE)
 attr(df, "topic_quality")
 ```
 
-## Method Benchmarking
+## Бенчмарк методов
 
-Run unified benchmark on one dataset:
+Запуск сравнения на одном датасете:
 
 ```r
 source("data-raw/compare_methods.R")
 ```
 
-Outputs:
+Результаты:
 
 - `data/method_comparison.csv`
 - `data/method_comparison.rds`
 
-## Mini Ground-Truth + Canonical Mapping
+## Mini ground-truth + canonical mapping
 
-This workflow gives presentation-grade supervised evidence (`accuracy`, `macro_f1`, confusion matrix).
+Этот workflow дает supervised-метрики для презентации: `accuracy`, `macro_f1`, confusion matrix.
 
-Run:
+Запуск:
 
 ```r
 source("data-raw/mini_ground_truth_workflow.R")
 ```
 
-### Workflow
+### Последовательность
 
-1. Script creates `data/ground_truth_template.csv`.
-2. Manually fill `topic_true`.
-3. Save as `data/ground_truth_labeled.csv`.
-4. Re-run script to compute metrics.
+1. Скрипт создает `data/ground_truth_template.csv`.
+2. Вручную заполняется колонка `topic_true`.
+3. Файл сохраняется как `data/ground_truth_labeled.csv`.
+4. Скрипт запускается повторно и считает метрики.
 
-### Files
+### Файлы
 
-- Mapping template: `data-raw/canonical_topic_mapping_template.csv`
-- Metrics summary: `data/ground_truth_metrics.csv`
-- Full metrics report: `data/ground_truth_metrics.rds`
+- шаблон mapping: `data-raw/canonical_topic_mapping_template.csv`
+- сводка метрик: `data/ground_truth_metrics.csv`
+- полный отчет: `data/ground_truth_metrics.rds`
 
-### Reusable functions
+### Переиспользуемые функции
 
 - `create_ground_truth_sample()`
 - `apply_canonical_label_mapping()`
 - `evaluate_against_ground_truth()`
 
-## Environment Variables
+## Переменные окружения
 
-Common:
+Основные:
 
 - `TTRSS_URL`, `TTRSS_USER`, `TTRSS_PASSWORD`
 - `CH_HOST`, `CH_PORT`, `CH_DB`, `CH_USER`, `CH_PASSWORD`
 - `CLASSIFY_METHOD`, `N_TOPICS`, `MAX_ARTICLES`
 
-Yandex LLM:
+Для Yandex LLM:
 
 - `YANDEX_CLOUD_API_KEY`
 - `YANDEX_CLOUD_FOLDER`
-- `YANDEX_CLOUD_MODEL` (default `yandexgpt-lite/rc`)
-- `YANDEX_CLOUD_BASE_URL` (default `https://rest-assistant.api.cloud.yandex.net/v1`)
-- `YANDEX_CACHE_PATH` (optional cache file override)
+- `YANDEX_CLOUD_MODEL` (по умолчанию `yandexgpt-lite/rc`)
+- `YANDEX_CLOUD_BASE_URL` (по умолчанию `https://rest-assistant.api.cloud.yandex.net/v1`)
+- `YANDEX_CACHE_PATH` (опционально, путь к cache-файлу)
 
-## MCP Integration
+## MCP-интеграция
 
-The project provides:
+В проекте есть:
 
-- `inst/mcp/stdio_server.R` for local agent integration via stdin/stdout.
-- `inst/mcp/server.R` for HTTP transport in Docker.
+- `inst/mcp/stdio_server.R` — локальный транспорт через stdin/stdout;
+- `inst/mcp/server.R` — HTTP-вариант для Docker.
 
-Current toolset includes:
+Доступные инструменты:
 
 - `search_articles`
 - `get_topic_summary`
 - `get_recent_articles`
 - `get_feed_stats`
 
-## Testing
+## Тестирование
 
-Tests are organized in `tests/testthat`:
+Покрытие тестами (`tests/testthat`):
 
-- API client coverage (`test-api.R`)
-- ETL and normalization (`test-etl.R`)
-- classification and quality logic (`test-classify.R`)
-- ground-truth/canonical mapping evaluation (`test-ground-truth.R`)
+- API-слой (`test-api.R`);
+- ETL и нормализация (`test-etl.R`);
+- классификация и quality-логика (`test-classify.R`);
+- ground-truth/canonical mapping (`test-ground-truth.R`).
 
-Run tests (locally with R installed):
+Запуск тестов (локально при установленном R):
 
 ```r
 testthat::test_dir("tests/testthat")
 ```
 
-## Repository
+## Репозиторий
 
 https://github.com/AlexeyPetrov1/news-ai-aggregator
