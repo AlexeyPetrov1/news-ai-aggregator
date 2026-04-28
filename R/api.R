@@ -172,6 +172,19 @@ ttrss_subscribe_feed <- function(base_url, session_id,
                    category_id = as.integer(category_id)))
 }
 
+#' Unsubscribe from an RSS feed
+#'
+#' @inheritParams ttrss_logout
+#' @param feed_id Integer feed ID (from \code{ttrss_get_feeds()}).
+#' @return \code{TRUE} invisibly on success.
+#' @export
+ttrss_unsubscribe_feed <- function(base_url, session_id, feed_id) {
+  .ttrss_call(base_url, "unsubscribeFeed",
+              list(sid     = session_id,
+                   feed_id = as.integer(feed_id)))
+  invisible(TRUE)
+}
+
 # ── internal ──────────────────────────────────────────────────────────────────
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x
