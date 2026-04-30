@@ -2,19 +2,15 @@
 #' @description Three interchangeable back-ends:
 #'   \code{"lda"} (Latent Dirichlet Allocation),
 #'   \code{"kmeans"} (TF-IDF + k-means clustering), and
-#'   \code{"llm"} / \code{"yandex_llm"} (LLM API call per article).
+#'   \code{"yandex_llm"} (Yandex API call per article).
 
 #' Classify articles into topics
 #'
 #' @param df        Data frame produced by \code{\link{fetch_news_dataframe}}.
 #'   Must contain a \code{content_text} column.
-#' @param n_topics  Number of topics (ignored for \code{"llm"} and
+#' @param n_topics  Number of topics (ignored for
 #'   \code{"yandex_llm"} methods).
-#' @param method    One of \code{"lda"}, \code{"kmeans"}, \code{"llm"},
-#'   \code{"yandex_llm"}.
-#' @param llm_api_key  API key (required for \code{method = "llm"}).
-#' @param llm_base_url Base URL of the LLM API
-#'   (default: Anthropic \code{https://api.anthropic.com}).
+#' @param method    One of \code{"lda"}, \code{"kmeans"}, \code{"yandex_llm"}.
 #' @param yandex_api_key API key for Yandex Cloud Assistant API.
 #'   If \code{NULL}, reads \code{YANDEX_CLOUD_API_KEY}.
 #' @param yandex_folder_id Yandex Cloud folder id.
@@ -35,15 +31,36 @@
 #'   them in \code{attr(result, "topic_quality")}.
 #' @param language  Stopword language passed to \code{tidytext::get_stopwords()}.
 #'   Use \code{c("ru", "en")} for bilingual corpora (default).
+#' @param allowed_topics Character vector of allowed closed-set labels for
+#'   \code{method = "yandex_llm"}.
+#' @param unknown_label Fallback label used when Yandex returns an unsupported
+#'   value.
 #' @return The original data frame with additional columns:
 #'   \code{topic} (integer), \code{topic_label} (character),
 #'   \code{topic_prob} (numeric, LDA only).
 #' @export
+DEFAULT_SECURITY_TOPICS <- c(
+  "Malware",
+  "Ransomware",
+  "Phishing",
+  "Vulnerability",
+  "Zero-Day",
+  "Data Breach",
+  "APT",
+  "DDoS",
+  "Supply Chain",
+  "Cloud Security",
+  "Identity and Access",
+  "Fraud",
+  "Threat Intelligence",
+  "Incident Response",
+  "Regulation and Compliance",
+  "Other"
+)
+
 classify_news <- function(df,
                           n_topics      = 10L,
-                          method        = c("lda", "kmeans", "llm", "yandex_llm"),
-                          llm_api_key   = NULL,
-                          llm_base_url  = "https://api.anthropic.com",
+                          method        = c("lda", "kmeans", "yandex_llm"),
                           yandex_api_key = NULL,
                           yandex_folder_id = NULL,
                           yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-lite/rc"),
@@ -54,9 +71,12 @@ classify_news <- function(df,
                           use_persistent_yandex_cache = TRUE,
                           yandex_cache_path = Sys.getenv("YANDEX_CACHE_PATH", "data/yandex_llm_cache.rds"),
                           compute_quality = FALSE,
-                          language      = c("ru", "en")) {
+                          language      = c("ru", "en"),
+                          allowed_topics = DEFAULT_SECURITY_TOPICS,
+                          unknown_label = "Other") {
 
   method <- match.arg(method)
+  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)
 
   if (!"content_text" %in% names(df)) {
     cli::cli_abort("{.arg df} must contain a {.field content_text} column.")
@@ -67,7 +87,6 @@ classify_news <- function(df,
   result <- switch(method,
     lda    = .classify_lda(df, n_topics, language),
     kmeans = .classify_kmeans(df, n_topics, language),
-    llm    = .classify_llm(df, llm_api_key, llm_base_url),
     yandex_llm = .classify_yandex_llm(
       df,
       api_key = yandex_api_key,
@@ -78,7 +97,9 @@ classify_news <- function(df,
       retry_base_sec = yandex_retry_base_sec,
       use_cache = use_yandex_cache,
       use_persistent_cache = use_persistent_yandex_cache,
-      cache_path = yandex_cache_path
+      cache_path = yandex_cache_path,
+      allowed_topics = allowed_topics,
+      unknown_label = unknown_label
     )
   )
 
@@ -193,55 +214,6 @@ classify_news <- function(df,
   df
 }
 
-# ── LLM ──────────────────────────────────────────────────────────────────────
-
-.classify_llm <- function(df, api_key, base_url) {
-  if (is.null(api_key) || !nzchar(api_key)) {
-    cli::cli_abort("Provide {.arg llm_api_key} for method='llm'.")
-  }
-
-  endpoint <- paste0(sub("/+$", "", base_url), "/v1/messages")
-
-  labels <- vapply(seq_len(nrow(df)), function(i) {
-    text <- substr(
-      paste(df$title[i] %||% "", df$content_text[i] %||% ""),
-      1L, 800L
-    )
-
-    body <- list(
-      model      = "claude-haiku-4-5-20251001",
-      max_tokens = 60L,
-      messages   = list(list(
-        role    = "user",
-        content = paste0(
-          "Определи тематическую категорию для следующей новости. ",
-          "Ответь ТОЛЬКО названием категории (1-3 слова) на русском языке.\n\n",
-          "Новость: ", text
-        )
-      ))
-    )
-
-    resp <- httr2::request(endpoint) |>
-      httr2::req_headers(
-        "x-api-key"         = api_key,
-        "anthropic-version" = "2023-06-01",
-        "content-type"      = "application/json"
-      ) |>
-      httr2::req_body_json(body) |>
-      httr2::req_error(is_error = \(r) FALSE) |>
-      httr2::req_perform()
-
-    if (httr2::resp_is_error(resp)) return("Без категории")
-
-    parsed <- httr2::resp_body_json(resp)
-    trimws(parsed$content[[1L]]$text %||% "Без категории")
-  }, character(1L))
-
-  df$topic_label <- labels
-  df$topic       <- as.integer(factor(labels))
-  df
-}
-
 # ── Yandex LLM ────────────────────────────────────────────────────────────────
 
 .yandex_cache <- new.env(parent = emptyenv())
@@ -251,7 +223,10 @@ classify_news <- function(df,
                                  retry_base_sec = 1,
                                  use_cache = TRUE,
                                  use_persistent_cache = TRUE,
-                                 cache_path = "data/yandex_llm_cache.rds") {
+                                 cache_path = "data/yandex_llm_cache.rds",
+                                 allowed_topics = DEFAULT_SECURITY_TOPICS,
+                                 unknown_label = "Other") {
+  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)
   api_key <- api_key %||% Sys.getenv("YANDEX_CLOUD_API_KEY", "")
   folder_id <- folder_id %||% Sys.getenv("YANDEX_CLOUD_FOLDER", "")
 
@@ -265,6 +240,7 @@ classify_news <- function(df,
   endpoint <- paste0(sub("/+$", "", base_url), "/responses")
   model_uri <- sprintf("gpt://%s/%s", folder_id, model)
   cache_path <- cache_path %||% ""
+  allowed_topics_text <- paste(allowed_topics, collapse = ", ")
   if (isTRUE(use_persistent_cache)) {
     .load_persistent_yandex_cache(cache_path)
   }
@@ -277,10 +253,12 @@ classify_news <- function(df,
 
     body <- list(
       model = model_uri,
-      temperature = 0.3,
+      temperature = 0,
       instructions = paste0(
-        "Определи тематическую категорию для следующей новости. ",
-        "Ответь только названием категории (1-3 слова) на русском языке."
+        "Classify the cybersecurity news into exactly one category from this list: ",
+        allowed_topics_text, ". ",
+        "Return exactly one label from the list, one line only, without explanations or extra text. ",
+        "Do not invent new categories."
       ),
       input = text,
       max_output_tokens = 60L
@@ -299,7 +277,7 @@ classify_news <- function(df,
       httr2::req_body_json(body) |>
       httr2::req_error(is_error = \(r) FALSE)
 
-    label <- "Без категории"
+    label <- unknown_label
     attempts <- max(1L, as.integer(max_retries))
     for (attempt in seq_len(attempts)) {
       resp <- tryCatch(httr2::req_perform(req), error = function(e) NULL)
@@ -321,7 +299,11 @@ classify_news <- function(df,
 
       parsed <- httr2::resp_body_json(resp, simplifyVector = FALSE)
       txt <- .extract_response_output_text(parsed)
-      label <- trimws(txt %||% "Без категории")
+      label <- .normalize_topic_label(
+        txt %||% unknown_label,
+        allowed_topics = allowed_topics,
+        unknown_label = unknown_label
+      )
       break
     }
 
@@ -332,11 +314,41 @@ classify_news <- function(df,
   }, character(1L))
 
   df$topic_label <- labels
-  df$topic       <- as.integer(factor(labels))
+  df$topic       <- as.integer(factor(labels, levels = allowed_topics))
   if (isTRUE(use_persistent_cache)) {
     .save_persistent_yandex_cache(cache_path)
   }
   df
+}
+
+.validate_allowed_topics <- function(allowed_topics, unknown_label = "Other") {
+  labels <- unique(trimws(as.character(allowed_topics)))
+  labels <- labels[nzchar(labels)]
+  if (!length(labels)) {
+    cli::cli_abort("{.arg allowed_topics} must contain at least one non-empty label.")
+  }
+  if (!unknown_label %in% labels) {
+    cli::cli_abort("{.arg allowed_topics} must include {.val {unknown_label}}.")
+  }
+  labels
+}
+
+.normalize_topic_label <- function(label, allowed_topics, unknown_label = "Other") {
+  raw <- trimws(as.character(label %||% ""))
+  if (!nzchar(raw)) return(unknown_label)
+  raw <- strsplit(raw, "\n", fixed = TRUE)[[1L]][1L]
+  raw <- trimws(gsub("^[[:punct:][:space:]]+|[[:punct:][:space:]]+$", "", raw))
+  if (!nzchar(raw)) return(unknown_label)
+
+  exact_idx <- match(raw, allowed_topics)
+  if (!is.na(exact_idx)) return(allowed_topics[[exact_idx]])
+
+  lower_allowed <- tolower(allowed_topics)
+  lower_raw <- tolower(raw)
+  case_idx <- match(lower_raw, lower_allowed)
+  if (!is.na(case_idx)) return(allowed_topics[[case_idx]])
+
+  unknown_label
 }
 
 .yandex_cache_key <- function(model_uri, text) {
