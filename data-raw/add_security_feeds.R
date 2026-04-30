@@ -7,9 +7,9 @@
 
 library(ttrssR)
 
-TTRSS_URL  <- "http://localhost:8080"
-TTRSS_USER <- "admin"
-TTRSS_PASS <- "password"
+TTRSS_URL  <- Sys.getenv("TTRSS_URL", "http://localhost:8080")
+TTRSS_USER <- Sys.getenv("TTRSS_USER", "admin")
+TTRSS_PASS <- Sys.getenv("TTRSS_PASSWORD", "password")
 
 # ── Источники по категориям (только русскоязычные) ───────────────────────────
 
@@ -62,8 +62,15 @@ for (cat_name in names(feeds)) {
       cat(sprintf("  [OK]  %s\n", url))
       "ok"
     }, error = function(e) {
-      cat(sprintf("  [ERR] %s\n       %s\n", url, conditionMessage(e)))
-      "err"
+      msg <- conditionMessage(e)
+      msg_lc <- tolower(msg)
+      if (grepl("already|exists|уже", msg_lc)) {
+        cat(sprintf("  [SKIP] %s\n       %s\n", url, msg))
+        "ok"
+      } else {
+        cat(sprintf("  [ERR] %s\n       %s\n", url, msg))
+        "err"
+      }
     })
 
     if (result == "ok") total_ok  <- total_ok  + 1L
@@ -88,3 +95,7 @@ if (nrow(feeds_df) > 0) {
 }
 
 ttrss_logout(TTRSS_URL, sid)
+
+if (total_ok == 0L) {
+  stop("Не удалось добавить ни одного фида. Проверьте доступность источников и TT-RSS API.")
+}

@@ -83,9 +83,104 @@ services:
       LLM_API_KEY:     ${LLM_API_KEY:-}
       CLASSIFY_METHOD: ${CLASSIFY_METHOD:-lda}
       N_TOPICS:        ${N_TOPICS:-8}
+      YANDEX_CLOUD_API_KEY: ${YANDEX_CLOUD_API_KEY:-}
+      YANDEX_CLOUD_FOLDER: ${YANDEX_CLOUD_FOLDER:-}
+      YANDEX_CLOUD_MODEL: ${YANDEX_CLOUD_MODEL:-yandexgpt-5-lite/latest}
     volumes:
       # Монтируем локальные данные в контейнер
       - ./data:/srv/shiny-server/ttrss/shiny/data:ro
+
+  # ── Scheduler (periodic fetch + write to ClickHouse) ───────────────────────
+  scheduler:
+    image: ttrssr-shiny:latest
+    container_name: ttrss-scheduler
+    restart: unless-stopped
+    working_dir: /pkg/ttrssR
+    networks:
+      - ttrss_default
+      - analytics_net
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      TTRSS_URL:       http://ttrss/
+      TTRSS_USER:      ${TTRSS_ADMIN_USER:-admin}
+      TTRSS_PASSWORD:  ${TTRSS_ADMIN_PASSWORD:-password}
+      CH_HOST:         clickhouse
+      CH_PORT:         9000
+      CH_DB:           ${CH_DB:-ttrss}
+      CH_USER:         ${CH_USER:-default}
+      CH_PASSWORD:     ${CH_PASSWORD:-}
+      MAX_ARTICLES:    ${MAX_ARTICLES:-500}
+      CLASSIFY_METHOD: ${CLASSIFY_METHOD:-lda}
+      N_TOPICS:        ${N_TOPICS:-8}
+      LLM_API_KEY:     ${LLM_API_KEY:-}
+      YANDEX_CLOUD_API_KEY: ${YANDEX_CLOUD_API_KEY:-}
+      YANDEX_CLOUD_FOLDER: ${YANDEX_CLOUD_FOLDER:-}
+      YANDEX_CLOUD_MODEL: ${YANDEX_CLOUD_MODEL:-yandexgpt-5-lite/latest}
+      YANDEX_CLOUD_BASE_URL: ${YANDEX_CLOUD_BASE_URL:-https://ai.api.cloud.yandex.net/v1}
+      YANDEX_CACHE_PATH: ${YANDEX_CACHE_PATH:-/pkg/ttrssR/data/yandex_llm_cache.rds}
+      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS:-300}
+      INIT_FEEDS_ON_START: ${INIT_FEEDS_ON_START:-true}
+      INIT_FEEDS_RETRY_MAX: ${INIT_FEEDS_RETRY_MAX:-5}
+      INIT_FEEDS_RETRY_DELAY_SECONDS: ${INIT_FEEDS_RETRY_DELAY_SECONDS:-30}
+      CONTINUE_ON_FEEDS_INIT_ERROR: ${CONTINUE_ON_FEEDS_INIT_ERROR:-true}
+      RUN_ADD_FEEDS_EACH_CYCLE: ${RUN_ADD_FEEDS_EACH_CYCLE:-false}
+    volumes:
+      - ./data:/pkg/ttrssR/data
+    command: >
+      sh -lc "
+      set +e;
+      normalize_bool() {
+        case \"\$${1:-}\" in
+          1|true|TRUE|yes|YES|on|ON) echo true ;;
+          *) echo false ;;
+        esac
+      };
+      INIT_ON_START=$$(normalize_bool \"$${INIT_FEEDS_ON_START:-true}\");
+      CONTINUE_ON_INIT_ERR=$$(normalize_bool \"$${CONTINUE_ON_FEEDS_INIT_ERROR:-true}\");
+      RUN_EACH_CYCLE=$$(normalize_bool \"$${RUN_ADD_FEEDS_EACH_CYCLE:-false}\");
+      INIT_MAX=$${INIT_FEEDS_RETRY_MAX:-5};
+      INIT_DELAY=$${INIT_FEEDS_RETRY_DELAY_SECONDS:-30};
+
+      if [ \"$$INIT_ON_START\" = \"true\" ]; then
+        attempt=1;
+        init_ok=0;
+        while [ \"$$attempt\" -le \"$$INIT_MAX\" ]; do
+          echo \"=== Feed bootstrap (attempt $$attempt/$$INIT_MAX) ===\";
+          Rscript data-raw/add_security_feeds.R;
+          code=$$?;
+          if [ \"$$code\" -eq 0 ]; then
+            init_ok=1;
+            echo \"Feed bootstrap completed.\";
+            break;
+          fi
+          echo \"Feed bootstrap failed with exit code $$code.\";
+          if [ \"$$attempt\" -lt \"$$INIT_MAX\" ]; then
+            echo \"Retrying in $$INIT_DELAY seconds...\";
+            sleep \"$$INIT_DELAY\";
+          fi
+          attempt=$$((attempt + 1));
+        done;
+
+        if [ \"$$init_ok\" -ne 1 ]; then
+          if [ \"$$CONTINUE_ON_INIT_ERR\" = \"true\" ]; then
+            echo \"Feed bootstrap exhausted retries; continuing to fetch loop.\";
+          else
+            echo \"Feed bootstrap failed and CONTINUE_ON_FEEDS_INIT_ERROR=false; exiting.\";
+            exit 1;
+          fi
+        fi
+      fi;
+
+      while true; do
+        if [ \"$$RUN_EACH_CYCLE\" = \"true\" ]; then
+          echo \"=== Feed sync before fetch cycle ===\";
+          Rscript data-raw/add_security_feeds.R || echo \"Feed sync failed; continuing fetch cycle.\";
+        fi;
+        Rscript data-raw/fetch_news.R || echo \"fetch_news failed; will retry next cycle.\";
+        sleep \"$${SCHEDULER_INTERVAL_SECONDS:-300}\";
+      done"
 
   # ── MCP Server ────────────────────────────────────────────────────────────
   mcp:
