@@ -34,7 +34,10 @@ news_df <- fetch_news_dataframe(
   batch_size   = 200L
 )
 
-if (nrow(news_df) == 0L) stop("Не удалось получить статьи. Проверьте TT-RSS.")
+if (nrow(news_df) == 0L) {
+  warning("TT-RSS пока не вернул статей; пропускаем цикл без ошибки.")
+  quit(save = "no", status = 0L)
+}
 
 message(sprintf("Получено статей: %d", nrow(news_df)))
 message(sprintf("Колонки: %s", paste(names(news_df), collapse = ", ")))

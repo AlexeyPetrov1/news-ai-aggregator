@@ -16,8 +16,8 @@
 #' @param yandex_folder_id Yandex Cloud folder id.
 #'   If \code{NULL}, reads \code{YANDEX_CLOUD_FOLDER}.
 #' @param yandex_model Yandex model name without folder prefix
-#'   (e.g. \code{"yandexgpt-lite/rc"}).
-#' @param yandex_base_url Base URL for Yandex Assistant API.
+#'   (e.g. \code{"yandexgpt-5-lite/latest"}).
+#' @param yandex_base_url Base URL for Yandex Responses API.
 #' @param yandex_max_retries Maximum retry attempts for transient
 #'   Yandex API failures (HTTP 429/5xx).
 #' @param yandex_retry_base_sec Base delay in seconds for exponential backoff.
@@ -63,8 +63,8 @@ classify_news <- function(df,
                           method        = c("lda", "kmeans", "yandex_llm"),
                           yandex_api_key = NULL,
                           yandex_folder_id = NULL,
-                          yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-lite/rc"),
-                          yandex_base_url = Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://rest-assistant.api.cloud.yandex.net/v1"),
+                          yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
+                          yandex_base_url = Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
                           yandex_max_retries = 3L,
                           yandex_retry_base_sec = 1,
                           use_yandex_cache = TRUE,
@@ -253,7 +253,6 @@ classify_news <- function(df,
 
     body <- list(
       model = model_uri,
-      temperature = 0,
       instructions = paste0(
         "Classify the cybersecurity news into exactly one category from this list: ",
         allowed_topics_text, ". ",
@@ -261,6 +260,7 @@ classify_news <- function(df,
         "Do not invent new categories."
       ),
       input = text,
+      temperature = 0,
       max_output_tokens = 60L
     )
 
@@ -271,10 +271,11 @@ classify_news <- function(df,
 
     req <- httr2::request(endpoint) |>
       httr2::req_headers(
-        "Authorization" = paste("Bearer", api_key),
+        "Authorization" = paste("Api-Key", api_key),
+        "OpenAI-Project" = folder_id,
         "Content-Type" = "application/json"
       ) |>
-      httr2::req_body_json(body) |>
+      httr2::req_body_json(body, auto_unbox = TRUE) |>
       httr2::req_error(is_error = \(r) FALSE)
 
     label <- unknown_label
