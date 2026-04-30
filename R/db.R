@@ -92,34 +92,111 @@ ch_init_schema <- function(con) {
 #' @return \code{df} invisibly.
 #' @export
 ch_write_articles <- function(con, df) {
+  if (!is.data.frame(df)) {
+    cli::cli_abort("{.arg df} must be a data frame.")
+  }
+
   if (nrow(df) == 0L) {
     cli::cli_warn("Empty data frame — nothing written.")
     return(invisible(df))
   }
 
-  # Ensure required columns exist with defaults
-  defaults <- list(
-    topic       = 0L,
-    topic_label = "",
-    topic_prob  = 0
+  if (!"article_id" %in% names(df)) {
+    cli::cli_abort("Column {.field article_id} not found in {.arg df}.")
+  }
+
+  # article_id is the core entity id. Rows without it are invalid.
+  df <- df[!is.na(df$article_id), , drop = FALSE]
+
+  if (nrow(df) == 0L) {
+    cli::cli_warn("No rows with non-missing article_id — nothing written.")
+    return(invisible(df))
+  }
+
+  # ClickHouse table columns are non-nullable, so replace NA before insert.
+  char_defaults <- c(
+    title        = "",
+    content      = "",
+    content_text = "",
+    link         = "",
+    feed_title   = "",
+    author       = "",
+    topic_label  = ""
   )
-  for (col in names(defaults)) {
-    if (!col %in% names(df)) df[[col]] <- defaults[[col]]
+
+  for (col in names(char_defaults)) {
+    if (!col %in% names(df)) {
+      df[[col]] <- char_defaults[[col]]
+    }
+
+    df[[col]] <- as.character(df[[col]])
+    df[[col]][is.na(df[[col]])] <- char_defaults[[col]]
   }
 
-  # ClickHouse expects integer 0/1 for UInt8
-  for (col in c("is_unread", "is_starred")) {
-    if (col %in% names(df)) df[[col]] <- as.integer(df[[col]])
+  int_defaults <- c(
+    article_id = 0L,
+    feed_id    = 0L,
+    topic      = 0L,
+    is_unread  = 0L,
+    is_starred = 0L
+  )
+
+  for (col in names(int_defaults)) {
+    if (!col %in% names(df)) {
+      df[[col]] <- int_defaults[[col]]
+    }
+
+    df[[col]][is.na(df[[col]])] <- int_defaults[[col]]
+    df[[col]] <- as.integer(df[[col]])
   }
 
-  # Only keep table columns
-  table_cols <- c("article_id", "title", "content", "content_text", "link",
-                  "feed_id", "feed_title", "author", "published_at",
-                  "fetched_at", "is_unread", "is_starred",
-                  "topic", "topic_label", "topic_prob")
-  df <- df[, intersect(table_cols, names(df)), drop = FALSE]
+  if (!"topic_prob" %in% names(df)) {
+    df$topic_prob <- 0
+  }
+  df$topic_prob[is.na(df$topic_prob)] <- 0
+  df$topic_prob <- as.numeric(df$topic_prob)
 
-  DBI::dbWriteTable(con, "articles", df, append = TRUE, overwrite = FALSE)
+  if (!"published_at" %in% names(df)) {
+    df$published_at <- Sys.time()
+  }
+  df$published_at[is.na(df$published_at)] <- Sys.time()
+  df$published_at <- as.POSIXct(df$published_at, tz = "UTC")
+
+  if (!"fetched_at" %in% names(df)) {
+    df$fetched_at <- Sys.time()
+  }
+  df$fetched_at[is.na(df$fetched_at)] <- Sys.time()
+  df$fetched_at <- as.POSIXct(df$fetched_at, tz = "UTC")
+
+  table_cols <- c(
+    "article_id",
+    "title",
+    "content",
+    "content_text",
+    "link",
+    "feed_id",
+    "feed_title",
+    "author",
+    "published_at",
+    "fetched_at",
+    "is_unread",
+    "is_starred",
+    "topic",
+    "topic_label",
+    "topic_prob"
+  )
+
+  df <- df[, table_cols, drop = FALSE]
+
+  DBI::dbWriteTable(
+    con,
+    "articles",
+    df,
+    append = TRUE,
+    overwrite = FALSE,
+    row.names = FALSE
+  )
+
   cli::cli_inform("Wrote {nrow(df)} articles to ClickHouse.")
   invisible(df)
 }

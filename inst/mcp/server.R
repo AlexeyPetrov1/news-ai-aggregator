@@ -41,6 +41,27 @@ source("/pkg/ttrssR/R/db.R")
   }
 }
 
+.cap_limit <- function(x, default = 10L, max_limit = 100L) {
+  lim <- suppressWarnings(as.integer(x %||% default))
+  if (is.na(lim) || lim <= 0L) return(default)
+  min(lim, max_limit)
+}
+
+.quote_sql <- function(value) {
+  as.character(DBI::dbQuoteString(.con, as.character(value)))
+}
+
+.escape_like <- function(value) {
+  gsub("([%_\\\\])", "\\\\\\1", as.character(value), perl = TRUE)
+}
+
+.date_or_null <- function(value) {
+  if (is.null(value) || !nzchar(value)) return(NULL)
+  d <- suppressWarnings(as.Date(as.character(value)))
+  if (is.na(d)) return(NULL)
+  as.character(d)
+}
+
 # ── Список инструментов ───────────────────────────────────────────────────────
 
 .tools <- list(
@@ -54,8 +75,14 @@ source("/pkg/ttrssR/R/db.R")
                         description = "Поисковый запрос (подстрока в заголовке или тексте)"),
         topic    = list(type = "string",
                         description = "Фильтр по метке темы (необязательно)"),
+        feed_title = list(type = "string",
+                          description = "Фильтр по названию источника (необязательно)"),
+        date_from = list(type = "string",
+                         description = "Нижняя граница даты (YYYY-MM-DD, необязательно)"),
+        date_to = list(type = "string",
+                       description = "Верхняя граница даты (YYYY-MM-DD, необязательно)"),
         limit    = list(type = "integer",
-                        description = "Максимум результатов (по умолч. 10)", default = 10L)
+                        description = "Максимум результатов (по умолч. 10, max 100)", default = 10L)
       ),
       required = list("query")
     )
@@ -80,7 +107,7 @@ source("/pkg/ttrssR/R/db.R")
         topic = list(type = "string",
                      description = "Фильтр по теме (необязательно)"),
         limit = list(type = "integer",
-                     description = "Кол-во статей (по умолч. 10)", default = 10L)
+                     description = "Кол-во статей (по умолч. 10, max 100)", default = 10L)
       )
     )
   ),
@@ -141,14 +168,31 @@ source("/pkg/ttrssR/R/db.R")
           "search_articles" = {
             q     <- args$query %||% ""
             topic <- args$topic %||% NULL
-            lim   <- as.integer(args$limit %||% 10L)
-            where <- sprintf(
-              "(lower(title) LIKE lower('%%%s%%') OR lower(content_text) LIKE lower('%%%s%%'))",
-              q, q
+            feed_title <- args$feed_title %||% NULL
+            date_from <- .date_or_null(args$date_from %||% NULL)
+            date_to <- .date_or_null(args$date_to %||% NULL)
+            lim   <- .cap_limit(args$limit %||% 10L)
+
+            q_pattern <- .quote_sql(paste0("%", .escape_like(q), "%"))
+            filters <- c(
+              sprintf(
+                "(lower(title) LIKE lower(%s) ESCAPE '\\\\' OR lower(content_text) LIKE lower(%s) ESCAPE '\\\\')",
+                q_pattern, q_pattern
+              )
             )
             if (!is.null(topic) && nzchar(topic)) {
-              where <- paste(where, sprintf("AND topic_label = '%s'", topic))
+              filters <- c(filters, sprintf("topic_label = %s", .quote_sql(topic)))
             }
+            if (!is.null(feed_title) && nzchar(feed_title)) {
+              filters <- c(filters, sprintf("feed_title = %s", .quote_sql(feed_title)))
+            }
+            if (!is.null(date_from)) {
+              filters <- c(filters, sprintf("published_at >= toDateTime(%s)", .quote_sql(date_from)))
+            }
+            if (!is.null(date_to)) {
+              filters <- c(filters, sprintf("published_at < toDateTime(%s) + INTERVAL 1 DAY", .quote_sql(date_to)))
+            }
+            where <- paste(filters, collapse = " AND ")
             df <- ch_read_articles(.con, where = where, limit = lim)
             df <- df[, intersect(c("article_id","title","feed_title",
                                     "topic_label","link","published_at"), names(df))]
@@ -164,9 +208,9 @@ source("/pkg/ttrssR/R/db.R")
 
           "get_recent_articles" = {
             topic <- args$topic %||% NULL
-            lim   <- as.integer(args$limit %||% 10L)
+            lim   <- .cap_limit(args$limit %||% 10L)
             where <- if (!is.null(topic) && nzchar(topic)) {
-              sprintf("topic_label = '%s'", topic)
+              sprintf("topic_label = %s", .quote_sql(topic))
             } else NULL
             df <- ch_read_articles(.con, where = where, limit = lim)
             df <- df[, intersect(c("article_id","title","feed_title",

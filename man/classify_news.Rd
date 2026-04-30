@@ -7,27 +7,56 @@
 classify_news(
   df,
   n_topics = 10L,
-  method = c("lda", "kmeans", "llm"),
-  llm_api_key = NULL,
-  llm_base_url = "https://api.anthropic.com",
-  language = c("ru", "en")
+  method = c("lda", "kmeans", "yandex_llm"),
+  yandex_api_key = NULL,
+  yandex_folder_id = NULL,
+  yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-lite/rc"),
+  yandex_base_url = Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://rest-assistant.api.cloud.yandex.net/v1"),
+  yandex_max_retries = 3L,
+  yandex_retry_base_sec = 1,
+  use_yandex_cache = TRUE,
+  use_persistent_yandex_cache = TRUE,
+  yandex_cache_path = Sys.getenv("YANDEX_CACHE_PATH", "data/yandex_llm_cache.rds"),
+  compute_quality = FALSE,
+  language = c("ru", "en"),
+  allowed_topics = DEFAULT_SECURITY_TOPICS,
+  unknown_label = "Other"
 )
 }
 \arguments{
 \item{df}{Data frame produced by \code{\link{fetch_news_dataframe}}.
 Must contain a \code{content_text} column.}
 
-\item{n_topics}{Number of topics (ignored for \code{"llm"} method).}
+\item{n_topics}{Number of topics (ignored for \code{"yandex_llm"} method).}
 
-\item{method}{One of \code{"lda"}, \code{"kmeans"}, \code{"llm"}.}
+\item{method}{One of \code{"lda"}, \code{"kmeans"}, \code{"yandex_llm"}.}
 
-\item{llm_api_key}{API key (required for \code{method = "llm"}).}
+\item{yandex_api_key}{API key for Yandex Cloud Assistant API.}
 
-\item{llm_base_url}{Base URL of the LLM API
-(default: Anthropic \code{https://api.anthropic.com}).}
+\item{yandex_folder_id}{Yandex Cloud folder id.}
+
+\item{yandex_model}{Yandex model name without folder prefix.}
+
+\item{yandex_base_url}{Base URL for Yandex Assistant API.}
+
+\item{yandex_max_retries}{Maximum retry attempts for transient Yandex API failures.}
+
+\item{yandex_retry_base_sec}{Base delay in seconds for exponential backoff.}
+
+\item{use_yandex_cache}{If \code{TRUE}, cache Yandex responses for repeated texts.}
+
+\item{use_persistent_yandex_cache}{If \code{TRUE}, persist Yandex cache on disk.}
+
+\item{yandex_cache_path}{Path to an RDS file used for persistent Yandex cache.}
+
+\item{compute_quality}{If \code{TRUE}, compute topic quality metrics and attach them to result attributes.}
 
 \item{language}{Stopword language passed to \code{tidytext::get_stopwords()}.
 Use \code{c("ru", "en")} for bilingual corpora (default).}
+
+\item{allowed_topics}{Character vector of allowed closed-set labels for \code{method = "yandex_llm"}.}
+
+\item{unknown_label}{Fallback label used for unsupported Yandex outputs.}
 }
 \value{
 The original data frame with additional columns:
@@ -38,6 +67,6 @@ The original data frame with additional columns:
 Three interchangeable back-ends:
 \code{"lda"} (Latent Dirichlet Allocation),
 \code{"kmeans"} (TF-IDF + k-means clustering), and
-\code{"llm"} (LLM API call per article).
+\code{"yandex_llm"} (Yandex API call per article in closed-set mode).
 Classify articles into topics
 }

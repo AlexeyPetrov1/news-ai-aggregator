@@ -37,12 +37,12 @@ ui <- dashboardPage(
               plotlyOutput("plot_feeds_pie", height = "300px"))
         ),
         fluidRow(
-          box(title = "Топ-20 ключевых слов", width = 7,
+          box(title = "Динамика top-категорий", width = 7,
               status = "primary", solidHeader = TRUE,
-              plotlyOutput("plot_keywords", height = "340px")),
-          box(title = "Активность по дням недели", width = 5,
+              plotlyOutput("plot_topic_trend", height = "340px")),
+          box(title = "Редкие категории (включая Other)", width = 5,
               status = "success", solidHeader = TRUE,
-              plotlyOutput("plot_weekday", height = "340px"))
+              plotlyOutput("plot_rare_topics", height = "340px"))
         )
       ),
 
@@ -93,7 +93,11 @@ ui <- dashboardPage(
           box(width = 6, title = "Классификация", status = "info",
               solidHeader = TRUE,
               selectInput("cfg_method", "Метод",
-                          choices = c("LDA" = "lda", "K-Means" = "kmeans")),
+                          choices = c(
+                            "LDA" = "lda",
+                            "K-Means" = "kmeans",
+                            "Yandex GPT (closed-set)" = "yandex_llm"
+                          )),
               numericInput("cfg_n_topics", "Количество тем",
                            value = 8, min = 2, max = 30),
               actionButton("btn_classify", "Классифицировать",
