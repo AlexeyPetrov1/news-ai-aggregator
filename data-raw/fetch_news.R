@@ -16,7 +16,6 @@ TTRSS_PASSWORD  <- Sys.getenv("TTRSS_PASSWORD",  "password")
 MAX_ARTICLES    <- as.integer(Sys.getenv("MAX_ARTICLES",    "500"))
 CLASSIFY_METHOD <- Sys.getenv("CLASSIFY_METHOD", "lda")
 N_TOPICS        <- as.integer(Sys.getenv("N_TOPICS",        "8"))
-LLM_API_KEY     <- Sys.getenv("LLM_API_KEY",     "")
 USE_CLICKHOUSE  <- nzchar(Sys.getenv("CH_HOST",  ""))
 
 PKG_DIR  <- "D:/prpject_R/ttrssR"
@@ -62,8 +61,7 @@ news_classified <- tryCatch(
   classify_news(
     df          = news_df,
     n_topics    = N_TOPICS,
-    method      = CLASSIFY_METHOD,
-    llm_api_key = if (nzchar(LLM_API_KEY)) LLM_API_KEY else NULL
+    method      = CLASSIFY_METHOD
   ),
   error = function(e) {
     message("Классификация не удалась: ", conditionMessage(e))

@@ -36,12 +36,6 @@ test_that("classify_news errors on missing content_text", {
   expect_error(classify_news(df, method = "lda"), "content_text")
 })
 
-test_that("classify_news llm errors without api key", {
-  df <- make_df(3)
-  expect_error(classify_news(df, method = "llm", llm_api_key = NULL),
-               "llm_api_key")
-})
-
 test_that("classify_news yandex_llm errors without api key", {
   df <- make_df(3)
   expect_error(
@@ -65,6 +59,53 @@ test_that("classify_news yandex_llm errors without folder id", {
       yandex_folder_id = ""
     ),
     "yandex_folder_id|YANDEX_CLOUD_FOLDER"
+  )
+})
+
+test_that("allowed_topics must be non-empty and contain Other", {
+  df <- make_df(3)
+  expect_error(
+    classify_news(
+      df,
+      method = "yandex_llm",
+      yandex_api_key = "dummy-key",
+      yandex_folder_id = "b1examplefolder",
+      allowed_topics = character(),
+      unknown_label = "Other"
+    ),
+    "allowed_topics"
+  )
+  expect_error(
+    classify_news(
+      df,
+      method = "yandex_llm",
+      yandex_api_key = "dummy-key",
+      yandex_folder_id = "b1examplefolder",
+      allowed_topics = c("Malware", "Phishing"),
+      unknown_label = "Other"
+    ),
+    "include.*Other"
+  )
+})
+
+test_that("normalize_topic_label handles exact, case-insensitive and invalid labels", {
+  allowed <- c("Malware", "Phishing", "Other")
+
+  expect_equal(
+    ttrssR:::.normalize_topic_label("Malware", allowed, "Other"),
+    "Malware"
+  )
+  expect_equal(
+    ttrssR:::.normalize_topic_label("phishing", allowed, "Other"),
+    "Phishing"
+  )
+  expect_equal(
+    ttrssR:::.normalize_topic_label("###Phishing###", allowed, "Other"),
+    "Phishing"
+  )
+  expect_equal(
+    ttrssR:::.normalize_topic_label("Completely Unknown Topic", allowed, "Other"),
+    "Other"
   )
 })
 

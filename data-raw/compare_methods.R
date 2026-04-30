@@ -4,7 +4,7 @@
 ## Сравнение методов классификации на одном наборе статей:
 ## - lda
 ## - kmeans
-## - yandex_llm (если заданы Yandex env)
+## - yandex_llm
 ##
 ## Выход:
 ##   data/method_comparison.csv
@@ -21,11 +21,16 @@ DATA_DIR <- file.path(PKG_DIR, "data")
 INPUT_RDS <- Sys.getenv("COMPARE_INPUT_RDS", file.path(DATA_DIR, "news_raw.rds"))
 N_TOPICS <- as.integer(Sys.getenv("N_TOPICS", "8"))
 MAX_DOCS <- as.integer(Sys.getenv("COMPARE_MAX_DOCS", "300"))
+UNKNOWN_LABEL <- "Other"
 
-methods <- c("lda", "kmeans")
-if (nzchar(Sys.getenv("YANDEX_CLOUD_API_KEY", "")) &&
-    nzchar(Sys.getenv("YANDEX_CLOUD_FOLDER", ""))) {
-  methods <- c(methods, "yandex_llm")
+methods <- c("lda", "kmeans", "yandex_llm")
+if (!nzchar(Sys.getenv("YANDEX_CLOUD_API_KEY", "")) ||
+    !nzchar(Sys.getenv("YANDEX_CLOUD_FOLDER", ""))) {
+  stop("Для бенчмарка yandex_llm задайте YANDEX_CLOUD_API_KEY и YANDEX_CLOUD_FOLDER.")
+}
+
+if (UNKNOWN_LABEL != "Other") {
+  stop("UNKNOWN_LABEL должен быть равен 'Other' для fixed-taxonomy режима.")
 }
 
 if (!file.exists(INPUT_RDS)) {
@@ -52,12 +57,17 @@ run_one <- function(method_name) {
   message("\n--- Метод: ", method_name, " ---")
   started <- Sys.time()
 
-  classified <- classify_news(
-    df,
+  classify_args <- list(
+    df = df,
     method = method_name,
     n_topics = N_TOPICS,
     compute_quality = TRUE
   )
+  if (identical(method_name, "yandex_llm")) {
+    classify_args$allowed_topics <- ttrssR::DEFAULT_SECURITY_TOPICS
+    classify_args$unknown_label <- UNKNOWN_LABEL
+  }
+  classified <- do.call(classify_news, classify_args)
   metrics <- attr(classified, "topic_quality")
   elapsed <- as.numeric(difftime(Sys.time(), started, units = "secs"))
 
