@@ -18,7 +18,7 @@ CLASSIFY_METHOD <- Sys.getenv("CLASSIFY_METHOD", "lda")
 N_TOPICS        <- as.integer(Sys.getenv("N_TOPICS",        "8"))
 USE_CLICKHOUSE  <- nzchar(Sys.getenv("CH_HOST",  ""))
 
-PKG_DIR  <- "D:/prpject_R/ttrssR"
+PKG_DIR  <- getwd()
 DATA_DIR <- file.path(PKG_DIR, "data")
 
 # ── Шаг 1: Сбор новостей ─────────────────────────────────────────────────────

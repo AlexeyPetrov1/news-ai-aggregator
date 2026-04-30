@@ -1,5 +1,5 @@
-## MCP stdio server для Claude Code
-## Claude Code запускает этот скрипт как процесс,
+## MCP stdio server для локальных AI-агентов
+## Локальный агент запускает этот скрипт как процесс,
 ## общается через stdin/stdout в формате JSON-RPC 2.0 (по одному объекту на строку).
 
 suppressPackageStartupMessages({
@@ -27,6 +27,27 @@ source(file.path(Sys.getenv("TTRSSR_PKG", "D:/prpject_R/ttrssR"), "R/db.R"))
 .err <- function(id, code, msg) list(jsonrpc = "2.0", id = id,
                                      error = list(code = code, message = msg))
 
+.cap_limit <- function(x, default = 10L, max_limit = 100L) {
+  lim <- suppressWarnings(as.integer(x %||% default))
+  if (is.na(lim) || lim <= 0L) return(default)
+  min(lim, max_limit)
+}
+
+.quote_sql <- function(value) {
+  as.character(DBI::dbQuoteString(.con, as.character(value)))
+}
+
+.escape_like <- function(value) {
+  gsub("([%_\\\\])", "\\\\\\1", as.character(value), perl = TRUE)
+}
+
+.date_or_null <- function(value) {
+  if (is.null(value) || !nzchar(value)) return(NULL)
+  d <- suppressWarnings(as.Date(as.character(value)))
+  if (is.na(d)) return(NULL)
+  as.character(d)
+}
+
 .tools <- list(
   list(name = "search_articles",
        description = "Search cybersecurity articles by keyword and/or topic.",
@@ -34,7 +55,10 @@ source(file.path(Sys.getenv("TTRSSR_PKG", "D:/prpject_R/ttrssR"), "R/db.R"))
          properties = list(
            query = list(type = "string", description = "Search term (substring in title or text)"),
            topic = list(type = "string", description = "Filter by topic label (optional)"),
-           limit = list(type = "integer", description = "Max results (default 10)", default = 10L)
+           feed_title = list(type = "string", description = "Filter by feed title (optional)"),
+           date_from = list(type = "string", description = "Start date (YYYY-MM-DD, optional)"),
+           date_to = list(type = "string", description = "End date (YYYY-MM-DD, optional)"),
+           limit = list(type = "integer", description = "Max results (default 10, max 100)", default = 10L)
          ), required = list("query"))),
   list(name = "get_topic_summary",
        description = "Get statistics by topic clusters: article counts per topic.",
@@ -47,7 +71,7 @@ source(file.path(Sys.getenv("TTRSSR_PKG", "D:/prpject_R/ttrssR"), "R/db.R"))
        inputSchema = list(type = "object",
          properties = list(
            topic = list(type = "string", description = "Filter by topic (optional)"),
-           limit = list(type = "integer", description = "Number of articles (default 10)", default = 10L)
+           limit = list(type = "integer", description = "Number of articles (default 10, max 100)", default = 10L)
          ))),
   list(name = "get_feed_stats",
        description = "Statistics by RSS feed sources: article counts per source.",
@@ -70,10 +94,29 @@ source(file.path(Sys.getenv("TTRSSR_PKG", "D:/prpject_R/ttrssR"), "R/db.R"))
       result <- tryCatch(switch(name,
         "search_articles" = {
           q   <- args$query %||% ""
-          lim <- as.integer(args$limit %||% 10L)
-          w   <- sprintf("(lower(title) LIKE lower('%%%s%%') OR lower(content_text) LIKE lower('%%%s%%'))", q, q)
-          if (!is.null(args$topic) && nzchar(args$topic))
-            w <- paste(w, sprintf("AND topic_label = '%s'", args$topic))
+          lim <- .cap_limit(args$limit %||% 10L)
+          feed_title <- args$feed_title %||% NULL
+          date_from <- .date_or_null(args$date_from %||% NULL)
+          date_to <- .date_or_null(args$date_to %||% NULL)
+
+          q_pattern <- .quote_sql(paste0("%", .escape_like(q), "%"))
+          filters <- c(sprintf(
+            "(lower(title) LIKE lower(%s) ESCAPE '\\\\' OR lower(content_text) LIKE lower(%s) ESCAPE '\\\\')",
+            q_pattern, q_pattern
+          ))
+          if (!is.null(args$topic) && nzchar(args$topic)) {
+            filters <- c(filters, sprintf("topic_label = %s", .quote_sql(args$topic)))
+          }
+          if (!is.null(feed_title) && nzchar(feed_title)) {
+            filters <- c(filters, sprintf("feed_title = %s", .quote_sql(feed_title)))
+          }
+          if (!is.null(date_from)) {
+            filters <- c(filters, sprintf("published_at >= toDateTime(%s)", .quote_sql(date_from)))
+          }
+          if (!is.null(date_to)) {
+            filters <- c(filters, sprintf("published_at < toDateTime(%s) + INTERVAL 1 DAY", .quote_sql(date_to)))
+          }
+          w <- paste(filters, collapse = " AND ")
           df <- ch_read_articles(.con, where = w, limit = lim)
           df <- df[, intersect(c("article_id","title","feed_title","topic_label","link","published_at"), names(df))]
           toJSON(df, auto_unbox = TRUE, dataframe = "rows")
@@ -83,9 +126,9 @@ source(file.path(Sys.getenv("TTRSSR_PKG", "D:/prpject_R/ttrssR"), "R/db.R"))
           toJSON(head(df, as.integer(args$top_n %||% 20L)), auto_unbox = TRUE, dataframe = "rows")
         },
         "get_recent_articles" = {
-          lim <- as.integer(args$limit %||% 10L)
+          lim <- .cap_limit(args$limit %||% 10L)
           w   <- if (!is.null(args$topic) && nzchar(args$topic %||% ""))
-                   sprintf("topic_label = '%s'", args$topic) else NULL
+                   sprintf("topic_label = %s", .quote_sql(args$topic)) else NULL
           df <- ch_read_articles(.con, where = w, limit = lim)
           df <- df[, intersect(c("article_id","title","feed_title","topic_label","link","published_at"), names(df))]
           toJSON(df, auto_unbox = TRUE, dataframe = "rows")

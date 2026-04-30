@@ -3,7 +3,6 @@ library(dplyr)
 library(ggplot2)
 library(plotly)
 library(DT)
-library(tidytext)
 library(ttrssR)
 
 .initial_df <- local({
@@ -21,10 +20,6 @@ library(ttrssR)
   }
 })
 if (!is.null(.initial_df)) message("[APP] Ready: ", nrow(.initial_df), " rows")
-
-.stopwords_ru_en <- dplyr::bind_rows(
-  lapply(c("ru", "en"), tidytext::get_stopwords)
-)
 
 server <- function(input, output, session) {
 
@@ -128,15 +123,22 @@ server <- function(input, output, session) {
   output$plot_topics <- renderPlotly({
     df <- rv$df
     req(df, "topic_label" %in% names(df))
-    top <- df |>
+    topic_stats <- df |>
       filter(!is.na(topic_label), nzchar(topic_label)) |>
       count(topic_label, sort = TRUE) |>
-      head(10)
-    req(nrow(top) > 0)
-    plot_ly(top,
+      mutate(
+        share = round(100 * n / sum(n), 1),
+        topic_label = if_else(topic_label == "Other",
+                              paste0(topic_label, " (fallback)"),
+                              topic_label)
+      )
+    req(nrow(topic_stats) > 0)
+    plot_ly(topic_stats,
             x = ~n,
             y = ~reorder(topic_label, n),
             type = "bar", orientation = "h",
+            text = ~paste0(share, "%"),
+            textposition = "outside",
             marker = list(color = "#00a65a")) |>
       layout(xaxis = list(title = "Статей"),
              yaxis = list(title = ""),
@@ -161,52 +163,62 @@ server <- function(input, output, session) {
              margin = list(l = 40, r = 20, t = 10, b = 130))
   })
 
-  output$plot_keywords <- renderPlotly({
+  output$plot_topic_trend <- renderPlotly({
     df <- rv$df
-    req(df)
-    text_col <- intersect(c("content_text", "title"), names(df))[1]
-    req(!is.na(text_col))
+    req(df, "published_at" %in% names(df), "topic_label" %in% names(df))
 
-    top_words <- df |>
-      tidytext::unnest_tokens(word, !!sym(text_col)) |>
-      filter(nchar(word) > 3L, !grepl("^[0-9]+$", word)) |>
-      anti_join(.stopwords_ru_en, by = "word") |>
-      count(word, sort = TRUE) |>
-      slice_head(n = 20L)
+    top_topics <- df |>
+      filter(!is.na(topic_label), nzchar(topic_label)) |>
+      count(topic_label, sort = TRUE) |>
+      slice_head(n = 6) |>
+      pull(topic_label)
 
-    req(nrow(top_words) > 0)
-    plot_ly(top_words,
-            x = ~n,
-            y = ~reorder(word, n),
-            type = "bar", orientation = "h",
-            marker = list(color = "#605ca8")) |>
-      layout(xaxis = list(title = "Упоминаний"),
-             yaxis = list(title = ""),
-             margin = list(l = 130, r = 20, t = 10, b = 40))
+    trend <- df |>
+      mutate(day = as.Date(as.character(published_at))) |>
+      filter(!is.na(day), !is.na(topic_label), nzchar(topic_label)) |>
+      mutate(topic_group = if_else(topic_label %in% top_topics, topic_label, "Other topics")) |>
+      count(day, topic_group) |>
+      arrange(day)
+
+    req(nrow(trend) > 0)
+    plot_ly(
+      trend,
+      x = ~day,
+      y = ~n,
+      color = ~topic_group,
+      colors = "Set2",
+      type = "scatter",
+      mode = "lines+markers"
+    ) |>
+      layout(
+        xaxis = list(title = ""),
+        yaxis = list(title = "Статей в день"),
+        legend = list(orientation = "h", y = -0.2),
+        margin = list(l = 60, r = 20, t = 10, b = 70)
+      )
   })
 
-  output$plot_weekday <- renderPlotly({
+  output$plot_rare_topics <- renderPlotly({
     df <- rv$df
-    req(df, "published_at" %in% names(df))
+    req(df, "topic_label" %in% names(df))
 
-    weekday_labels <- c("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
+    rare <- df |>
+      filter(!is.na(topic_label), nzchar(topic_label)) |>
+      count(topic_label, sort = TRUE) |>
+      arrange(n) |>
+      slice_head(n = 8)
 
-    wd <- df |>
-      mutate(date = as.Date(as.character(published_at))) |>
-      filter(!is.na(date)) |>
-      mutate(wday = lubridate::wday(date, week_start = 1L)) |>
-      count(wday) |>
-      mutate(label = weekday_labels[wday])
-
-    req(nrow(wd) > 0)
-    plot_ly(wd,
-            x = ~factor(label, levels = weekday_labels),
+    req(nrow(rare) > 0)
+    plot_ly(rare,
+            x = ~reorder(topic_label, n),
             y = ~n,
             type = "bar",
             marker = list(color = "#00c0ef")) |>
-      layout(xaxis = list(title = ""),
-             yaxis = list(title = "Статей"),
-             margin = list(l = 50, r = 20, t = 10, b = 40))
+      layout(
+        xaxis = list(title = "", tickangle = -30),
+        yaxis = list(title = "Статей"),
+        margin = list(l = 50, r = 20, t = 10, b = 90)
+      )
   })
 
   # ── Таблицы ───────────────────────────────────────────────────────────────
