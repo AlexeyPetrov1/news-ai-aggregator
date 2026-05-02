@@ -313,6 +313,209 @@ cat .env
 
 ---
 
+### 9.4. Подробная инструкция по созданию `.env`
+
+#### Шаг 1. Создать файл
+
+В корне репозитория создайте `.env` на основе шаблона:
+
+**Linux / macOS:**
+
+```bash
+cp .env.example .env
+```
+
+**Windows (PowerShell):**
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Если `.env.example` отсутствует, создайте файл вручную:
+
+**Linux / macOS:**
+
+```bash
+touch .env
+```
+
+**Windows (PowerShell):**
+
+```powershell
+New-Item .env -ItemType File
+```
+
+---
+
+#### Шаг 2. TT-RSS
+
+```env
+# URL TT-RSS API
+# При запуске через Docker Compose оставьте http://ttrss:8080
+# При ручном локальном запуске R-скриптов используйте http://localhost:8080
+TTRSS_URL=http://ttrss:8080
+
+# Учётные данные пользователя TT-RSS (используются R-скриптами)
+TTRSS_USER=admin
+TTRSS_PASSWORD=password
+
+# Учётные данные администратора (используются Docker Compose для конфигурации сервиса)
+TTRSS_ADMIN_USER=admin
+TTRSS_ADMIN_PASSWORD=password
+```
+
+Если при первом входе в TT-RSS вы изменили пароль администратора — укажите актуальные значения во всех четырёх переменных.
+
+---
+
+#### Шаг 3. ClickHouse
+
+```env
+# Хост ClickHouse
+# При запуске через Docker Compose: CH_HOST=clickhouse (имя сервиса в compose-сети)
+# При ручном локальном запуске R-скриптов: CH_HOST=localhost
+CH_HOST=clickhouse
+
+# Порт нативного протокола ClickHouse (используется R-клиентом)
+CH_PORT=9000
+
+# Порт HTTP-интерфейса ClickHouse (используется для healthcheck)
+CH_HTTP_PORT=8123
+
+# База данных
+CH_DB=ttrss
+
+# Пользователь и пароль (по умолчанию пароль пустой)
+CH_USER=default
+CH_PASSWORD=
+```
+
+---
+
+#### Шаг 4. Параметры сбора данных
+
+```env
+# Максимальное количество статей, которое пайплайн обрабатывает за один цикл
+MAX_ARTICLES=500
+
+# Интервал между циклами сбора в секундах
+# 3600 = 1 час, 300 = 5 минут
+SCHEDULER_INTERVAL_SECONDS=3600
+```
+
+---
+
+#### Шаг 5. Метод классификации
+
+Поддерживаются три метода. Выберите один в зависимости от ваших потребностей:
+
+**Вариант A — `lda` (по умолчанию, не требует внешних сервисов):**
+
+```env
+CLASSIFY_METHOD=lda
+N_TOPICS=8
+```
+
+**Вариант B — `kmeans` (baseline-кластеризация, не требует внешних сервисов):**
+
+```env
+CLASSIFY_METHOD=kmeans
+N_TOPICS=8
+```
+
+**Вариант C — `yandex_llm` (LLM-классификация, требует Yandex Cloud API key):**
+
+```env
+CLASSIFY_METHOD=yandex_llm
+N_TOPICS=8
+
+# Секрет API key сервисного аккаунта или AI Studio API key
+# Важно: это именно секрет ключа, а не его ID
+YANDEX_CLOUD_API_KEY=<ваш-api-key>
+
+# ID каталога в Yandex Cloud, в котором доступна модель
+YANDEX_CLOUD_FOLDER=<folder_id>
+
+# Модель
+YANDEX_CLOUD_MODEL=yandexgpt-5-lite/latest
+
+# Базовый URL API
+YANDEX_CLOUD_BASE_URL=https://ai.api.cloud.yandex.net/v1
+
+# Путь к файлу кеша ответов модели (экономит запросы при повторных текстах)
+YANDEX_CACHE_PATH=data/yandex_llm_cache.rds
+```
+
+Как получить Yandex Cloud credentials:
+
+1. Войдите в консоль Yandex Cloud.
+2. Выберите нужный каталог — его ID будет в адресной строке и в разделе «Обзор каталога». Это `YANDEX_CLOUD_FOLDER`.
+3. Перейдите в **IAM → Сервисные аккаунты**, создайте сервисный аккаунт и назначьте ему роль `ai.languageModels.user`.
+4. В настройках сервисного аккаунта создайте **API-ключ** и скопируйте **Секрет** — это `YANDEX_CLOUD_API_KEY`.
+
+---
+
+#### Шаг 6. Параметры поведения scheduler (опционально)
+
+Эти переменные управляют инициализацией RSS-фидов при старте контейнера. Значения по умолчанию подходят для большинства случаев.
+
+```env
+# Запускать инициализацию фидов при старте контейнера
+INIT_FEEDS_ON_START=true
+
+# Максимальное количество попыток инициализации фидов
+INIT_FEEDS_RETRY_MAX=5
+
+# Задержка между попытками инициализации в секундах
+INIT_FEEDS_RETRY_DELAY_SECONDS=30
+
+# Продолжать работу scheduler, если инициализация фидов не удалась
+CONTINUE_ON_FEEDS_INIT_ERROR=true
+
+# Повторять добавление фидов в каждом цикле (не нужно в обычном режиме)
+RUN_ADD_FEEDS_EACH_CYCLE=false
+```
+
+---
+
+#### Итоговый минимальный `.env` для запуска через Docker Compose (метод `lda`)
+
+```env
+# TT-RSS
+TTRSS_URL=http://ttrss:8080
+TTRSS_USER=admin
+TTRSS_PASSWORD=password
+TTRSS_ADMIN_USER=admin
+TTRSS_ADMIN_PASSWORD=password
+
+# ClickHouse
+CH_HOST=clickhouse
+CH_PORT=9000
+CH_HTTP_PORT=8123
+CH_DB=ttrss
+CH_USER=default
+CH_PASSWORD=
+
+# Сбор данных
+MAX_ARTICLES=500
+SCHEDULER_INTERVAL_SECONDS=3600
+
+# Классификация (lda — без внешних API)
+CLASSIFY_METHOD=lda
+N_TOPICS=8
+
+# Scheduler
+INIT_FEEDS_ON_START=true
+INIT_FEEDS_RETRY_MAX=5
+INIT_FEEDS_RETRY_DELAY_SECONDS=30
+CONTINUE_ON_FEEDS_INIT_ERROR=true
+RUN_ADD_FEEDS_EACH_CYCLE=false
+```
+
+> Файл `.env` содержит секреты и не должен попадать в репозиторий. Убедитесь, что `.env` есть в `.gitignore`.
+
+---
+
 ## 10. Clean start: рекомендуемый запуск
 
 Из корня репозитория:
