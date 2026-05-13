@@ -26,6 +26,7 @@ Imports:
     reshape2 (>= 1.4.4),
     topicmodels (>= 0.2.0),
     DBI (>= 1.2.0),
+    RPostgres (>= 1.4.0),
     RClickhouse (>= 0.5.2),
     shiny (>= 1.8.0),
     shinydashboard (>= 0.7.2),

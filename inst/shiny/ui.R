@@ -12,6 +12,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Обзор",     tabName = "overview",  icon = icon("chart-bar")),
       menuItem("Новости",   tabName = "articles",  icon = icon("newspaper")),
+      menuItem("Метки",     tabName = "labels",    icon = icon("tags")),
       menuItem("Источники", tabName = "feeds",     icon = icon("rss")),
       menuItem("Настройки", tabName = "settings",  icon = icon("cog"))
     )
@@ -62,6 +63,39 @@ ui <- dashboardPage(
         fluidRow(
           box(width = 12,
               DT::dataTableOutput("tbl_articles"))
+        )
+      ),
+
+      # ── Метки ───────────────────────────────────────────────────────────────
+      tabItem(tabName = "labels",
+        fluidRow(
+          box(width = 4, title = "Создать метку", status = "success", solidHeader = TRUE,
+            textInput("lbl_caption", "Название"),
+            textInput("lbl_fg", "Цвет текста (hex)", "#ffffff"),
+            textInput("lbl_bg", "Цвет фона (hex)",   "#e14a00"),
+            actionButton("btn_lbl_create", "Создать", icon = icon("plus"),
+                         class = "btn-success btn-block"),
+            hr(),
+            actionButton("btn_lbl_refresh", "Обновить список", icon = icon("sync"))
+          ),
+          box(width = 8, title = "Список меток", status = "info", solidHeader = TRUE,
+            DT::dataTableOutput("tbl_labels")
+          )
+        ),
+        fluidRow(
+          box(width = 12, title = "Назначить метку на статьи", status = "warning",
+              solidHeader = TRUE,
+            fluidRow(
+              column(4, selectInput("lbl_assign_label", "Метка:", choices = NULL)),
+              column(4, selectInput("lbl_assign_topic", "Тема статей:",
+                                    choices = c("Все"), selected = "Все")),
+              column(4, br(),
+                     actionButton("btn_lbl_assign", "Назначить", icon = icon("tag"),
+                                  class = "btn-warning"))
+            ),
+            hr(),
+            DT::dataTableOutput("tbl_label_articles")
+          )
         )
       ),
 

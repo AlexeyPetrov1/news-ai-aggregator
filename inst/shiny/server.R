@@ -267,6 +267,114 @@ server <- function(input, output, session) {
       DT::datatable(options = list(pageLength = 20), rownames = FALSE)
   })
 
+  # ── Метки ─────────────────────────────────────────────────────────────────
+  rv_labels <- reactiveVal(data.frame(
+    id = integer(), caption = character(), fg_color = character(),
+    bg_color = character(), stringsAsFactors = FALSE
+  ))
+
+  .fetch_labels <- function() {
+    tryCatch({
+      sid <- ttrss_login(input$cfg_ttrss_url, input$cfg_ttrss_user, input$cfg_ttrss_pass)
+      on.exit(try(ttrss_logout(input$cfg_ttrss_url, sid), silent = TRUE))
+      labels <- ttrss_get_labels(input$cfg_ttrss_url, sid)
+      rv_labels(labels[, c("id", "caption", "fg_color", "bg_color")])
+      .log("Метки загружены: ", nrow(labels), " шт.")
+    }, error = function(e) .log("Ошибка загрузки меток: ", conditionMessage(e)))
+  }
+
+  observeEvent(input$btn_lbl_refresh, {
+    .fetch_labels()
+  })
+
+  observeEvent(input$btn_lbl_create, {
+    req(input$lbl_caption)
+    tryCatch({
+      sid <- ttrss_login(input$cfg_ttrss_url, input$cfg_ttrss_user, input$cfg_ttrss_pass)
+      on.exit(try(ttrss_logout(input$cfg_ttrss_url, sid), silent = TRUE))
+      api_id <- ttrss_create_label_api(
+        caption    = input$lbl_caption,
+        fg_color   = input$lbl_fg,
+        bg_color   = input$lbl_bg,
+        base_url   = input$cfg_ttrss_url,
+        session_id = sid
+      )
+      if (!is.na(api_id)) {
+        .log("Метка создана: ", input$lbl_caption)
+        updateTextInput(session, "lbl_caption", value = "")
+        .fetch_labels()
+      }
+    }, error = function(e) .log("Ошибка создания метки: ", conditionMessage(e)))
+  })
+
+  observe({
+    labels <- rv_labels()
+    choices <- setNames(labels$id, labels$caption)
+    updateSelectInput(session, "lbl_assign_label", choices = choices)
+  })
+
+  output$tbl_labels <- DT::renderDataTable({
+    labels <- rv_labels()
+    req(nrow(labels) > 0)
+    DT::datatable(labels,
+      options = list(pageLength = 15, dom = "tp"),
+      rownames = FALSE)
+  })
+
+  # Articles available for labeling (from ClickHouse)
+  label_articles_df <- reactive({
+    df <- rv$df
+    req(df)
+    cols <- intersect(c("article_id", "published_at", "feed_title", "title", "topic_label"),
+                      names(df))
+    out <- df[, cols, drop = FALSE]
+    if (!is.null(input$lbl_assign_topic) && !("Все" %in% input$lbl_assign_topic) &&
+        length(input$lbl_assign_topic) > 0) {
+      out <- out[out$topic_label %in% input$lbl_assign_topic, , drop = FALSE]
+    }
+    out
+  })
+
+  observe({
+    df <- rv$df
+    req(df)
+    topics <- c("Все", sort(unique(df$topic_label[!is.na(df$topic_label) & nzchar(df$topic_label)])))
+    updateSelectInput(session, "lbl_assign_topic", choices = topics, selected = "Все")
+  })
+
+  output$tbl_label_articles <- DT::renderDataTable({
+    df <- label_articles_df()
+    req(nrow(df) > 0)
+    DT::datatable(df,
+      options = list(pageLength = 10, scrollX = TRUE,
+                     order = list(list(1, "desc"))),
+      rownames = FALSE)
+  })
+
+  observeEvent(input$btn_lbl_assign, {
+    req(input$lbl_assign_label)
+    selected <- input$tbl_label_articles_rows_selected
+    if (length(selected) == 0) {
+      showNotification("Выберите статьи в таблице", type = "warning")
+      return()
+    }
+    df <- label_articles_df()
+    aids <- df$article_id[selected]
+    tryCatch({
+      sid <- ttrss_login(input$cfg_ttrss_url, input$cfg_ttrss_user, input$cfg_ttrss_pass)
+      on.exit(try(ttrss_logout(input$cfg_ttrss_url, sid), silent = TRUE))
+      res <- ttrss_set_article_label(input$cfg_ttrss_url, sid,
+                                     article_ids = aids,
+                                     label_id    = as.integer(input$lbl_assign_label))
+      n <- as.integer(res$updated %||% 0)
+      showNotification(sprintf("Метка назначена: %d статей", n), type = "success")
+      .log("Метка назначена на ", n, " статей")
+    }, error = function(e) {
+      showNotification(paste("Ошибка:", conditionMessage(e)), type = "error")
+      .log("Ошибка назначения метки: ", conditionMessage(e))
+    })
+  })
+
   output$log_output <- renderText({
     paste(tail(rv$log, 20), collapse = "\n")
   })

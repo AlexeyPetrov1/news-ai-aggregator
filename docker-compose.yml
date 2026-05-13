@@ -71,7 +71,7 @@ services:
     volumes:
       - ttrss_data:/var/www/html/tt-rss/feed-icons
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
       interval: 10s
       timeout:  5s
       retries:  10
@@ -79,7 +79,7 @@ services:
 
   # ── Автоматическое включение API для admin ───────────────────────────────
   ttrss-init:
-    image: postgres:15-alpine
+    image: wangqiru/ttrss:latest
     container_name: ttrss-init
     restart: "no"
     networks:
@@ -88,24 +88,17 @@ services:
       ttrss:
         condition: service_healthy
     environment:
-      PGPASSWORD: ${TTRSS_DB_PASSWORD:-ttrss_secret}
-    command: >
+      DB_HOST: ttrss-db
+      DB_PORT: 5432
+      DB_NAME: ttrss
+      DB_USER: ttrss
+      DB_PASS: ${TTRSS_DB_PASSWORD:-ttrss_secret}
+    entrypoint: >
       sh -c "
-        echo 'Waiting for TT-RSS schema...';
-        for i in \$$(seq 1 15); do
-          if psql -h ttrss-db -U ttrss -d ttrss -c \"SELECT 1 FROM ttrss_prefs LIMIT 1\" >/dev/null 2>&1; then
-            echo 'Schema ready.';
-            break;
-          fi;
-          echo \"Attempt \$$i/15: schema not ready, retrying...\";
-          sleep 2;
-        done;
+        echo 'Initializing TT-RSS config...';
+        sh /wait-for.sh $$DB_HOST:$$DB_PORT -- php /initialize.php;
         echo 'Enabling API access for admin user...';
-        psql -h ttrss-db -U ttrss -d ttrss -c \"
-          INSERT INTO ttrss_prefs (owner_uid, pref_name, value, section_id)
-          VALUES (1, 'ENABLE_API_ACCESS', 'true', 1)
-          ON CONFLICT (owner_uid, pref_name) DO UPDATE SET value = 'true'
-        \";
+        s6-setuidgid nobody php /var/www/update.php --user-enable-api admin:true;
         echo 'API access enabled.'
       "
 

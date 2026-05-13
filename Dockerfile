@@ -30,6 +30,9 @@ RUN Rscript -e "\
   ); \
   install.packages(pkgs, repos='https://cloud.r-project.org', Ncpus=4)"
 
+# ── Дополнительные пакеты (отдельно — не ломает кэш основного списка) ──────
+RUN Rscript -e "install.packages('RPostgres', repos='https://cloud.r-project.org', Ncpus=4)"
+
 # ── Копируем пакет и устанавливаем ────────────────────────────────────────
 COPY . /pkg/ttrssR/
 RUN Rscript -e "install.packages('/pkg/ttrssR', repos=NULL, type='source')"

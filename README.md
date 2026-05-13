@@ -99,9 +99,10 @@ TT-RSS -> нормализация -> topic classification -> ClickHouse -> Shin
 |---|---|
 | `ttrss-db` | PostgreSQL для TT-RSS |
 | `ttrss` | TT-RSS web UI и API |
+| `ttrss-init` | one-shot: включает API-доступ для admin |
 | `clickhouse` | аналитическое хранилище |
 | `scheduler` | периодический запуск `fetch_news.R`; основной ingestion path |
-| `shiny` | UI-дашборд |
+| `shiny` | UI-дашборд (вкладки: Обзор, Новости, Метки, Источники, Настройки) |
 | `mcp` | JSON-RPC endpoint с MCP-инструментами |
 
 ---
@@ -125,7 +126,30 @@ admin / password
 
 ---
 
-## 5. Технологии
+## 5. Метки (Labels)
+
+Вкладка **Метки** в Shiny-дашборде позволяет управлять TT-RSS-метками:
+
+- **Создание** меток с названием и цветом — через PostgreSQL напрямую
+- **Просмотр** списка меток через TT-RSS API (`getLabels`)
+- **Назначение** меток на статьи через API (`setArticleLabel`)
+- **Фильтрация** статей по темам перед назначением
+
+API-функции в `R/api.R`:
+- `ttrss_get_labels()` — список меток (через TT-RSS API)
+- `ttrss_set_article_label()` — назначить/снять метку
+
+Управление в `R/labels.R` (создание/удаление — напрямую в PostgreSQL):
+- `ttrss_create_label()` — создать метку
+- `ttrss_create_label_api()` — создать и получить API-ID
+- `ttrss_delete_label()` — удалить
+- `ttrss_find_label_api_id()` — найти API-ID по названию
+- `ttrss_get_article_labels()` — метки конкретных статей
+- `ttrss_bulk_label_articles()` — массовое назначение
+
+---
+
+## 6. Технологии
 
 | Слой | Технологии |
 |---|---|
@@ -146,7 +170,8 @@ admin / password
 ```text
 news-ai-aggregator/
 ├── R/
-│   ├── api.R                         # клиент TT-RSS API
+│   ├── api.R                         # клиент TT-RSS API (включая labels)
+│   ├── labels.R                      # управление метками TT-RSS
 │   ├── etl.R                         # сбор и нормализация данных
 │   ├── classify.R                    # lda / kmeans / yandex_llm + quality logic
 │   ├── ground_truth.R                # optional validation utilities
@@ -543,30 +568,25 @@ http://localhost:8080
 admin / password
 ```
 
-Далее нужно включить API-доступ.
-
-### Включение API через UI
-
-1. Открыть `http://localhost:8080`.
-2. Войти под admin-пользователем.
-3. Перейти в user settings.
-4. Включить `Enable API access` / `Enable external API`.
-5. Сохранить изменения.
-
-Если API не включен, ingestion падает с ошибкой:
-
-```text
-API_DISABLED
-```
+**API-доступ включается автоматически** сервисом `ttrss-init` при первом запуске. Ручное включение через UI больше не требуется.
 
 ### Проверка контейнеров:
 
 ```bash
 docker compose ps
-docker ps
 ```
 
-Ожидаемо должны быть запущены все 6 сервисов: `ttrss-db`, `ttrss`, `clickhouse`, `scheduler`, `shiny`, `mcp`.
+Ожидаемо — 7 контейнеров (6 сервисов + one-shot `ttrss-init`):
+
+```text
+ttrss-db          Up (healthy)
+ttrss             Up (healthy)
+ttrss-init        Exited (0)   ← API включён
+clickhouse        Up (healthy)
+ttrss-shiny       Up
+ttrss-mcp         Up
+ttrss-scheduler   Up
+```
 
 
 ---

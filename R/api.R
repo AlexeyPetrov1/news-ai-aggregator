@@ -185,6 +185,41 @@ ttrss_unsubscribe_feed <- function(base_url, session_id, feed_id) {
   invisible(TRUE)
 }
 
+# ── labels ──────────────────────────────────────────────────────────────────────
+
+#' Get all configured labels, optionally for a specific article
+#'
+#' @inheritParams ttrss_logout
+#' @param article_id Optional article ID. If provided, each label includes
+#'   a \code{checked} field indicating whether it is applied to that article.
+#' @return A data frame with columns: \code{id}, \code{caption},
+#'   \code{fg_color}, \code{bg_color}, \code{checked} (logical).
+#' @export
+ttrss_get_labels <- function(base_url, session_id, article_id = NULL) {
+  params <- list(sid = session_id)
+  if (!is.null(article_id)) params$article_id <- as.integer(article_id)
+  content <- .ttrss_call(base_url, "getLabels", params)
+  if (length(content) == 0) return(data.frame())
+  .rows_to_df(content)
+}
+
+#' Assign or remove a label on one or more articles
+#'
+#' @inheritParams ttrss_logout
+#' @param article_ids Integer vector of article IDs.
+#' @param label_id    Label ID (from \code{ttrss_get_labels()}).
+#' @param assign      \code{TRUE} to assign the label, \code{FALSE} to remove it.
+#' @return Named list with \code{status} and \code{updated} (count of updated articles).
+#' @export
+ttrss_set_article_label <- function(base_url, session_id,
+                                    article_ids, label_id, assign = TRUE) {
+  .ttrss_call(base_url, "setArticleLabel",
+              list(sid         = session_id,
+                   article_ids = paste(as.integer(article_ids), collapse = ","),
+                   label_id    = as.integer(label_id),
+                   assign      = isTRUE(assign)))
+}
+
 # ── internal ──────────────────────────────────────────────────────────────────
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x
