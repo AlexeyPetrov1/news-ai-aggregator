@@ -1,8 +1,9 @@
 #' @title Thematic classification of news articles
-#' @description Three interchangeable back-ends:
+#' @description Four interchangeable back-ends:
 #'   \code{"lda"} (Latent Dirichlet Allocation),
-#'   \code{"kmeans"} (TF-IDF + k-means clustering), and
-#'   \code{"yandex_llm"} (Yandex API call per article).
+#'   \code{"kmeans"} (TF-IDF + k-means clustering),
+#'   \code{"yandex_llm"} (Yandex API call per article), and
+#'   \code{"llm"} (any provider via the \pkg{ellmer} package).
 
 #' Classify articles into topics
 #'
@@ -60,7 +61,7 @@ DEFAULT_SECURITY_TOPICS <- c(
 
 classify_news <- function(df,
                           n_topics      = 10L,
-                          method        = c("lda", "kmeans", "yandex_llm"),
+                          method        = c("lda", "kmeans", "yandex_llm", "llm"),
                           yandex_api_key = NULL,
                           yandex_folder_id = NULL,
                           yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
@@ -73,7 +74,11 @@ classify_news <- function(df,
                           compute_quality = FALSE,
                           language      = c("ru", "en"),
                           allowed_topics = DEFAULT_SECURITY_TOPICS,
-                          unknown_label = "Other") {
+                          unknown_label = "Other",
+                          llm_provider = c("openai", "anthropic", "gemini", "ollama"),
+                          llm_api_key  = NULL,
+                          llm_model    = NULL,
+                          llm_base_url = NULL) {
 
   method <- match.arg(method)
   allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)
@@ -87,6 +92,15 @@ classify_news <- function(df,
   result <- switch(method,
     lda    = .classify_lda(df, n_topics, language),
     kmeans = .classify_kmeans(df, n_topics, language),
+    llm    = .classify_ellmer(
+      df,
+      provider       = match.arg(llm_provider),
+      api_key        = llm_api_key,
+      model          = llm_model,
+      base_url       = llm_base_url,
+      allowed_topics = allowed_topics,
+      unknown_label  = unknown_label
+    ),
     yandex_llm = .classify_yandex_llm(
       df,
       api_key = yandex_api_key,
@@ -322,6 +336,207 @@ classify_news <- function(df,
   df
 }
 
+# ── Universal LLM ─────────────────────────────────────────────────────────────
+#
+# provider = "openai"    — OpenAI и ЛЮБОЙ OpenAI-совместимый API (DeepSeek,
+#                          Groq, Together, Mistral, LM Studio, vLLM и т.д.)
+#                          Реализован через httr2 напрямую — без ellmer,
+#                          поэтому принимает любое имя модели без капризов.
+# provider = "anthropic" — Anthropic Claude (через ellmer)
+# provider = "gemini"    — Google Gemini   (через ellmer)
+# provider = "ollama"    — Ollama local    (через ellmer)
+
+.classify_ellmer <- function(df, provider, api_key, model, base_url,
+                              allowed_topics = DEFAULT_SECURITY_TOPICS,
+                              unknown_label  = "Other") {
+  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)
+  provider  <- match.arg(provider, c("openai", "anthropic", "gemini", "ollama"))
+  api_key   <- api_key  %||% Sys.getenv("LLM_API_KEY", "")
+  model     <- model    %||% ""
+  base_url  <- base_url %||% ""
+
+  # OpenAI и все OpenAI-совместимые: используем httr2 напрямую
+  if (provider == "openai") {
+    return(.classify_openai_compat(df, api_key, model, base_url,
+                                   allowed_topics, unknown_label))
+  }
+
+  # Остальные провайдеры — через ellmer
+  topics_list <- paste(seq_along(allowed_topics), allowed_topics,
+                       sep = ". ", collapse = "\n")
+  system_prompt <- paste0(
+    "You are a news classifier. ",
+    "Classify the cybersecurity article into EXACTLY ONE topic from this list:\n",
+    topics_list, "\n\n",
+    "Rules:\n",
+    "- Reply with ONLY the exact topic name as it appears in the list above\n",
+    "- No explanations, no numbering, no extra words\n",
+    "- One line only"
+  )
+
+  make_chat <- function() {
+    switch(provider,
+      anthropic = ellmer::chat_anthropic(
+        system_prompt = system_prompt,
+        api_key       = api_key,
+        model         = if (nzchar(model)) model else "claude-3-5-haiku-latest"
+      ),
+      gemini    = ellmer::chat_google_gemini(
+        system_prompt = system_prompt,
+        api_key       = api_key,
+        model         = if (nzchar(model)) model else "gemini-1.5-flash"
+      ),
+      ollama    = ellmer::chat_ollama(
+        system_prompt = system_prompt,
+        model         = if (nzchar(model)) model else "llama3.2",
+        base_url      = if (nzchar(base_url)) base_url else "http://localhost:11434"
+      )
+    )
+  }
+
+  first_err <- NULL
+  n_errors  <- 0L
+
+  labels <- vapply(seq_len(nrow(df)), function(i) {
+    text <- substr(
+      paste(df$title[i] %||% "", df$content_text[i] %||% ""),
+      1L, 1200L
+    )
+    tryCatch({
+      raw <- make_chat()$chat(text)
+      .normalize_topic_label(raw, allowed_topics, unknown_label)
+    }, error = function(e) {
+      n_errors  <<- n_errors + 1L
+      if (is.null(first_err)) first_err <<- .llm_friendly_error(conditionMessage(e))
+      unknown_label
+    })
+  }, character(1L))
+
+  .llm_check_errors(n_errors, nrow(df), first_err)
+
+  df$topic_label <- labels
+  df$topic       <- as.integer(factor(labels, levels = allowed_topics))
+  df
+}
+
+# Прямой вызов через httr2 для OpenAI и любых совместимых API
+.classify_openai_compat <- function(df, api_key, model, base_url,
+                                    allowed_topics, unknown_label) {
+  # Нормализуем base URL по соглашению OpenAI SDK:
+  # конечная точка всегда <base>/v1/chat/completions.
+  # Если пользователь вставил https://api.deepseek.com (как в документации DeepSeek),
+  # автоматически добавляем /v1 — не нужно помнить, что именно вводить.
+  raw_url <- if (nzchar(base_url %||% "")) sub("/+$", "", base_url)
+             else "https://api.openai.com"
+  effective_url   <- if (grepl("/v1$", raw_url)) raw_url else paste0(raw_url, "/v1")
+  effective_model <- if (nzchar(model %||% "")) model else "gpt-4o-mini"
+  endpoint        <- paste0(effective_url, "/chat/completions")
+
+  topics_list <- paste(seq_along(allowed_topics), allowed_topics,
+                       sep = ". ", collapse = "\n")
+  system_msg <- paste0(
+    "You are a news classifier. ",
+    "Classify the cybersecurity article into EXACTLY ONE topic from this list:\n",
+    topics_list, "\n\n",
+    "Rules:\n",
+    "- Reply with ONLY the exact topic name as it appears in the list above\n",
+    "- No explanations, no numbering, no extra words\n",
+    "- One line only"
+  )
+
+  first_err <- NULL
+  n_errors  <- 0L
+
+  labels <- vapply(seq_len(nrow(df)), function(i) {
+    text <- substr(
+      paste(df$title[i] %||% "", df$content_text[i] %||% ""),
+      1L, 1200L
+    )
+    body <- list(
+      model    = effective_model,
+      messages = list(
+        list(role = "system", content = system_msg),
+        list(role = "user",   content = text)
+      ),
+      max_tokens  = 50L,
+      temperature = 0
+    )
+    tryCatch({
+      resp <- httr2::request(endpoint) |>
+        httr2::req_headers(
+          "Authorization" = paste("Bearer", api_key),
+          "Content-Type"  = "application/json"
+        ) |>
+        httr2::req_body_json(body, auto_unbox = TRUE) |>
+        httr2::req_error(is_error = \(r) FALSE) |>
+        httr2::req_perform()
+
+      status <- httr2::resp_status(resp)
+      parsed <- tryCatch(
+        httr2::resp_body_json(resp, simplifyVector = FALSE),
+        error = function(e) NULL
+      )
+
+      if (status != 200L) {
+        err_msg <- parsed$error$message %||%
+                   parsed$message       %||%
+                   paste("HTTP", status)
+        stop(err_msg)
+      }
+
+      raw <- parsed$choices[[1L]]$message$content %||% ""
+      .normalize_topic_label(raw, allowed_topics, unknown_label)
+    }, error = function(e) {
+      n_errors  <<- n_errors + 1L
+      if (is.null(first_err)) {
+        first_err <<- paste0(.llm_friendly_error(conditionMessage(e)),
+                             "\n  endpoint: ", endpoint,
+                             "\n  model: ", effective_model)
+      }
+      unknown_label
+    })
+  }, character(1L))
+
+  .llm_check_errors(n_errors, nrow(df), first_err)
+
+  df$topic_label <- labels
+  df$topic       <- as.integer(factor(labels, levels = allowed_topics))
+  df
+}
+
+.llm_check_errors <- function(n_errors, n_total, first_err) {
+  if (n_errors == 0L) return(invisible(NULL))
+  if (n_errors == n_total) {
+    cli::cli_abort(
+      c("Все {n_total} статей не удалось классифицировать.",
+        "x" = "{first_err}")
+    )
+  }
+  cli::cli_warn(
+    "{n_errors}/{n_total} статей не классифицировано; присвоено fallback-метку."
+  )
+}
+
+.llm_friendly_error <- function(msg) {
+  if (grepl("Insufficient Balance|insufficient_balance", msg, ignore.case = TRUE))
+    return(paste0("Недостаточно средств на балансе. ",
+                  "Пополните счёт на платформе провайдера (например platform.deepseek.com). ",
+                  "API-ключ и настройки верны."))
+  if (grepl("401|Unauthorized|invalid api key|incorrect api", msg, ignore.case = TRUE))
+    return("Неверный API-ключ (HTTP 401). Проверьте поле «API Key».")
+  if (grepl("404|not found|No such model|does not exist", msg, ignore.case = TRUE))
+    return(paste0("Модель или endpoint не найдены (HTTP 404). ",
+                  "Проверьте имя модели. Base URL вводится без /v1 ",
+                  "(например https://api.deepseek.com — /v1 добавляется автоматически)."))
+  if (grepl("429|Too Many Requests|rate.limit", msg, ignore.case = TRUE))
+    return("Превышен лимит запросов (HTTP 429). Подождите и повторите.")
+  if (grepl("parse error body|missing value where TRUE/FALSE|content_type", msg,
+            ignore.case = TRUE, perl = TRUE))
+    return(paste0("Ошибка разбора ответа API. Проверьте API-ключ и base URL."))
+  msg
+}
+
+
 .validate_allowed_topics <- function(allowed_topics, unknown_label = "Other") {
   labels <- unique(trimws(as.character(allowed_topics)))
   labels <- labels[nzchar(labels)]
@@ -337,17 +552,43 @@ classify_news <- function(df,
 .normalize_topic_label <- function(label, allowed_topics, unknown_label = "Other") {
   raw <- trimws(as.character(label %||% ""))
   if (!nzchar(raw)) return(unknown_label)
-  raw <- strsplit(raw, "\n", fixed = TRUE)[[1L]][1L]
-  raw <- trimws(gsub("^[[:punct:][:space:]]+|[[:punct:][:space:]]+$", "", raw))
-  if (!nzchar(raw)) return(unknown_label)
-
-  exact_idx <- match(raw, allowed_topics)
-  if (!is.na(exact_idx)) return(allowed_topics[[exact_idx]])
 
   lower_allowed <- tolower(allowed_topics)
-  lower_raw <- tolower(raw)
-  case_idx <- match(lower_raw, lower_allowed)
-  if (!is.na(case_idx)) return(allowed_topics[[case_idx]])
+
+  # Strip markdown/formatting from a single candidate string
+  .clean <- function(s) {
+    s <- gsub("[*_`#~]", "", s)
+    s <- gsub("\\(.*?\\)", "", s)
+    trimws(gsub("^[[:punct:][:space:]]+|[[:punct:][:space:]]+$", "", s))
+  }
+
+  # Try exact then case-insensitive match on a cleaned token
+  .match_token <- function(s) {
+    s <- .clean(s)
+    if (!nzchar(s)) return(NA_character_)
+    idx <- match(s, allowed_topics)
+    if (!is.na(idx)) return(allowed_topics[[idx]])
+    idx <- match(tolower(s), lower_allowed)
+    if (!is.na(idx)) return(allowed_topics[[idx]])
+    NA_character_
+  }
+
+  # 1. Check every non-empty line
+  lines <- trimws(strsplit(raw, "\n", fixed = TRUE)[[1L]])
+  for (ln in lines[nzchar(lines)]) {
+    hit <- .match_token(ln)
+    if (!is.na(hit)) return(hit)
+  }
+
+  # 2. Word-boundary substring search across the full response
+  for (j in seq_along(allowed_topics)) {
+    pattern <- paste0(
+      "(?i)\\b",
+      gsub("([^[:alnum:]])", "\\\\\\1", allowed_topics[j]),
+      "\\b"
+    )
+    if (grepl(pattern, raw, perl = TRUE)) return(allowed_topics[[j]])
+  }
 
   unknown_label
 }

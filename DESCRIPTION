@@ -37,7 +37,8 @@ Imports:
     plumber (>= 1.2.0),
     glue (>= 1.7.0),
     cli (>= 3.6.0),
-    rlang (>= 1.1.0)
+    rlang (>= 1.1.0),
+    ellmer (>= 0.1.0)
 Suggests:
     testthat (>= 3.0.0),
     knitr,
