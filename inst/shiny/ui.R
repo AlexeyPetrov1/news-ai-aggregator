@@ -12,7 +12,6 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Обзор",     tabName = "overview",  icon = icon("chart-bar")),
       menuItem("Новости",   tabName = "articles",  icon = icon("newspaper")),
-      menuItem("Метки",     tabName = "labels",    icon = icon("tags")),
       menuItem("Источники", tabName = "feeds",     icon = icon("rss")),
       menuItem("Настройки", tabName = "settings",  icon = icon("cog"))
     )
@@ -66,39 +65,6 @@ ui <- dashboardPage(
         )
       ),
 
-      # ── Метки ───────────────────────────────────────────────────────────────
-      tabItem(tabName = "labels",
-        fluidRow(
-          box(width = 4, title = "Создать метку", status = "success", solidHeader = TRUE,
-            textInput("lbl_caption", "Название"),
-            textInput("lbl_fg", "Цвет текста (hex)", "#ffffff"),
-            textInput("lbl_bg", "Цвет фона (hex)",   "#e14a00"),
-            actionButton("btn_lbl_create", "Создать", icon = icon("plus"),
-                         class = "btn-success btn-block"),
-            hr(),
-            actionButton("btn_lbl_refresh", "Обновить список", icon = icon("sync"))
-          ),
-          box(width = 8, title = "Список меток", status = "info", solidHeader = TRUE,
-            DT::dataTableOutput("tbl_labels")
-          )
-        ),
-        fluidRow(
-          box(width = 12, title = "Назначить метку на статьи", status = "warning",
-              solidHeader = TRUE,
-            fluidRow(
-              column(4, selectInput("lbl_assign_label", "Метка:", choices = NULL)),
-              column(4, selectInput("lbl_assign_topic", "Тема статей:",
-                                    choices = c("Все"), selected = "Все")),
-              column(4, br(),
-                     actionButton("btn_lbl_assign", "Назначить", icon = icon("tag"),
-                                  class = "btn-warning"))
-            ),
-            hr(),
-            DT::dataTableOutput("tbl_label_articles")
-          )
-        )
-      ),
-
       # ── Источники ──────────────────────────────────────────────────────────
       tabItem(tabName = "feeds",
         fluidRow(
@@ -130,10 +96,40 @@ ui <- dashboardPage(
                           choices = c(
                             "LDA" = "lda",
                             "K-Means" = "kmeans",
-                            "Yandex GPT (closed-set)" = "yandex_llm"
+                            "Yandex GPT" = "yandex_llm",
+                            "LLM (любой провайдер)" = "llm"
                           )),
-              numericInput("cfg_n_topics", "Количество тем",
+              numericInput("cfg_n_topics", "Количество тем (LDA / K-Means)",
                            value = 8, min = 2, max = 30),
+              tags$hr(),
+              tags$strong("LLM — универсальные настройки (метод «LLM»)"),
+              tags$br(), tags$br(),
+              selectInput("cfg_llm_provider", "Провайдер",
+                          choices = c(
+                            "OpenAI / OpenAI-совместимый (DeepSeek, Groq, …)" = "openai",
+                            "Anthropic Claude" = "anthropic",
+                            "Google Gemini" = "gemini",
+                            "Ollama (local)" = "ollama"
+                          )),
+              passwordInput("cfg_llm_api_key", "API Key",
+                            value = Sys.getenv("LLM_API_KEY", "")),
+              textInput("cfg_llm_model", "Модель (любое название)",
+                        value = "",
+                        placeholder = "deepseek-v4-flash  /  gpt-4o-mini  /  llama3.2  …"),
+              textInput("cfg_llm_base_url", "Base URL",
+                        value = "",
+                        placeholder = "пусто = OpenAI  |  DeepSeek: https://api.deepseek.com"),
+              helpText(
+                tags$b("OpenAI:"), "оставьте Base URL пустым.", tags$br(),
+                tags$b("DeepSeek:"), tags$code("https://api.deepseek.com"),
+                "— /v1 добавляется автоматически.",
+                "Модели: deepseek-v4-flash / deepseek-v4-pro.", tags$br(),
+                tags$b("Groq:"), tags$code("https://api.groq.com/openai/v1"), tags$br(),
+                tags$b("Ollama:"), "Base URL = http://localhost:11434."
+              ),
+              tags$hr(),
+              tags$strong("Yandex GPT — настройки (метод «Yandex GPT»)"),
+              tags$br(), tags$br(),
               passwordInput("cfg_yandex_api_key", "Yandex API key",
                             value = Sys.getenv("YANDEX_CLOUD_API_KEY", "")),
               textInput("cfg_yandex_folder", "Yandex folder id",

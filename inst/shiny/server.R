@@ -72,30 +72,49 @@ server <- function(input, output, session) {
     .log("Классификация (", input$cfg_method, ")…")
     withProgress(message = "Классификация…", {
       tryCatch({
-        yandex_api_key <- trimws(if (is.null(input$cfg_yandex_api_key)) "" else input$cfg_yandex_api_key)
-        yandex_folder <- trimws(if (is.null(input$cfg_yandex_folder)) "" else input$cfg_yandex_folder)
-        yandex_model <- trimws(if (is.null(input$cfg_yandex_model)) "" else input$cfg_yandex_model)
+        yandex_api_key  <- trimws(if (is.null(input$cfg_yandex_api_key)) "" else input$cfg_yandex_api_key)
+        yandex_folder   <- trimws(if (is.null(input$cfg_yandex_folder)) "" else input$cfg_yandex_folder)
+        yandex_model    <- trimws(if (is.null(input$cfg_yandex_model)) "" else input$cfg_yandex_model)
         yandex_base_url <- trimws(if (is.null(input$cfg_yandex_base_url)) "" else input$cfg_yandex_base_url)
+        llm_api_key     <- trimws(if (is.null(input$cfg_llm_api_key)) "" else input$cfg_llm_api_key)
+        llm_model       <- trimws(if (is.null(input$cfg_llm_model)) "" else input$cfg_llm_model)
+        llm_base_url    <- trimws(if (is.null(input$cfg_llm_base_url)) "" else input$cfg_llm_base_url)
+        llm_provider    <- if (is.null(input$cfg_llm_provider)) "openai" else input$cfg_llm_provider
 
         if (identical(input$cfg_method, "yandex_llm")) {
           if (!nzchar(yandex_api_key)) {
-            .log("Ошибка: не задан Yandex API key (поле настроек или YANDEX_CLOUD_API_KEY).")
+            .log("Ошибка: не задан Yandex API key.")
             return(invisible(NULL))
           }
           if (!nzchar(yandex_folder)) {
-            .log("Ошибка: не задан Yandex folder id (поле настроек или YANDEX_CLOUD_FOLDER).")
+            .log("Ошибка: не задан Yandex folder id.")
+            return(invisible(NULL))
+          }
+        }
+
+        if (identical(input$cfg_method, "llm")) {
+          needs_key <- llm_provider %in% c("openai", "anthropic", "gemini")
+          if (needs_key && !nzchar(llm_api_key) &&
+              !nzchar(Sys.getenv("LLM_API_KEY", ""))) {
+            .log("Ошибка: не задан API Key (поле «API Key» или переменная LLM_API_KEY).")
             return(invisible(NULL))
           }
         }
 
         rv$df <- classify_news(
           rv$df,
-          n_topics = input$cfg_n_topics,
-          method = input$cfg_method,
-          yandex_api_key = if (nzchar(yandex_api_key)) yandex_api_key else NULL,
+          n_topics         = input$cfg_n_topics,
+          method           = input$cfg_method,
+          yandex_api_key   = if (nzchar(yandex_api_key)) yandex_api_key else NULL,
           yandex_folder_id = if (nzchar(yandex_folder)) yandex_folder else NULL,
-          yandex_model = if (nzchar(yandex_model)) yandex_model else Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
-          yandex_base_url = if (nzchar(yandex_base_url)) yandex_base_url else Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
+          yandex_model     = if (nzchar(yandex_model)) yandex_model
+                             else Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
+          yandex_base_url  = if (nzchar(yandex_base_url)) yandex_base_url
+                             else Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
+          llm_provider     = llm_provider,
+          llm_api_key      = if (nzchar(llm_api_key)) llm_api_key else NULL,
+          llm_model        = if (nzchar(llm_model)) llm_model else NULL,
+          llm_base_url     = if (nzchar(llm_base_url)) llm_base_url else NULL
         )
         .log("Готово. Тем: ", length(unique(rv$df$topic_label)))
       }, error = function(e) .log("Ошибка: ", conditionMessage(e)))
@@ -248,9 +267,13 @@ server <- function(input, output, session) {
   output$tbl_articles <- DT::renderDataTable({
     df <- filtered_df()
     req(df, nrow(df) > 0)
-    cols <- intersect(c("published_at", "feed_title", "topic_label", "title", "author"), names(df))
+    cols <- intersect(
+      c("published_at", "feed_title", "topic_label", "title", "author"),
+      names(df)
+    )
     df <- df[, cols, drop = FALSE]
     DT::datatable(df,
+      selection = "multiple",
       options = list(pageLength = 20, scrollX = TRUE,
                      order = list(list(0, "desc"))),
       rownames = FALSE)
@@ -265,114 +288,6 @@ server <- function(input, output, session) {
       arrange(desc(Статей)) |>
       rename(Источник = feed_title) |>
       DT::datatable(options = list(pageLength = 20), rownames = FALSE)
-  })
-
-  # ── Метки ─────────────────────────────────────────────────────────────────
-  rv_labels <- reactiveVal(data.frame(
-    id = integer(), caption = character(), fg_color = character(),
-    bg_color = character(), stringsAsFactors = FALSE
-  ))
-
-  .fetch_labels <- function() {
-    tryCatch({
-      sid <- ttrss_login(input$cfg_ttrss_url, input$cfg_ttrss_user, input$cfg_ttrss_pass)
-      on.exit(try(ttrss_logout(input$cfg_ttrss_url, sid), silent = TRUE))
-      labels <- ttrss_get_labels(input$cfg_ttrss_url, sid)
-      rv_labels(labels[, c("id", "caption", "fg_color", "bg_color")])
-      .log("Метки загружены: ", nrow(labels), " шт.")
-    }, error = function(e) .log("Ошибка загрузки меток: ", conditionMessage(e)))
-  }
-
-  observeEvent(input$btn_lbl_refresh, {
-    .fetch_labels()
-  })
-
-  observeEvent(input$btn_lbl_create, {
-    req(input$lbl_caption)
-    tryCatch({
-      sid <- ttrss_login(input$cfg_ttrss_url, input$cfg_ttrss_user, input$cfg_ttrss_pass)
-      on.exit(try(ttrss_logout(input$cfg_ttrss_url, sid), silent = TRUE))
-      api_id <- ttrss_create_label_api(
-        caption    = input$lbl_caption,
-        fg_color   = input$lbl_fg,
-        bg_color   = input$lbl_bg,
-        base_url   = input$cfg_ttrss_url,
-        session_id = sid
-      )
-      if (!is.na(api_id)) {
-        .log("Метка создана: ", input$lbl_caption)
-        updateTextInput(session, "lbl_caption", value = "")
-        .fetch_labels()
-      }
-    }, error = function(e) .log("Ошибка создания метки: ", conditionMessage(e)))
-  })
-
-  observe({
-    labels <- rv_labels()
-    choices <- setNames(labels$id, labels$caption)
-    updateSelectInput(session, "lbl_assign_label", choices = choices)
-  })
-
-  output$tbl_labels <- DT::renderDataTable({
-    labels <- rv_labels()
-    req(nrow(labels) > 0)
-    DT::datatable(labels,
-      options = list(pageLength = 15, dom = "tp"),
-      rownames = FALSE)
-  })
-
-  # Articles available for labeling (from ClickHouse)
-  label_articles_df <- reactive({
-    df <- rv$df
-    req(df)
-    cols <- intersect(c("article_id", "published_at", "feed_title", "title", "topic_label"),
-                      names(df))
-    out <- df[, cols, drop = FALSE]
-    if (!is.null(input$lbl_assign_topic) && !("Все" %in% input$lbl_assign_topic) &&
-        length(input$lbl_assign_topic) > 0) {
-      out <- out[out$topic_label %in% input$lbl_assign_topic, , drop = FALSE]
-    }
-    out
-  })
-
-  observe({
-    df <- rv$df
-    req(df)
-    topics <- c("Все", sort(unique(df$topic_label[!is.na(df$topic_label) & nzchar(df$topic_label)])))
-    updateSelectInput(session, "lbl_assign_topic", choices = topics, selected = "Все")
-  })
-
-  output$tbl_label_articles <- DT::renderDataTable({
-    df <- label_articles_df()
-    req(nrow(df) > 0)
-    DT::datatable(df,
-      options = list(pageLength = 10, scrollX = TRUE,
-                     order = list(list(1, "desc"))),
-      rownames = FALSE)
-  })
-
-  observeEvent(input$btn_lbl_assign, {
-    req(input$lbl_assign_label)
-    selected <- input$tbl_label_articles_rows_selected
-    if (length(selected) == 0) {
-      showNotification("Выберите статьи в таблице", type = "warning")
-      return()
-    }
-    df <- label_articles_df()
-    aids <- df$article_id[selected]
-    tryCatch({
-      sid <- ttrss_login(input$cfg_ttrss_url, input$cfg_ttrss_user, input$cfg_ttrss_pass)
-      on.exit(try(ttrss_logout(input$cfg_ttrss_url, sid), silent = TRUE))
-      res <- ttrss_set_article_label(input$cfg_ttrss_url, sid,
-                                     article_ids = aids,
-                                     label_id    = as.integer(input$lbl_assign_label))
-      n <- as.integer(res$updated %||% 0)
-      showNotification(sprintf("Метка назначена: %d статей", n), type = "success")
-      .log("Метка назначена на ", n, " статей")
-    }, error = function(e) {
-      showNotification(paste("Ошибка:", conditionMessage(e)), type = "error")
-      .log("Ошибка назначения метки: ", conditionMessage(e))
-    })
   })
 
   output$log_output <- renderText({
