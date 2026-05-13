@@ -1,33 +1,119 @@
 ## ============================================================
-## Полный аналитический стек: ClickHouse + Shiny + MCP Server
-##
-## TT-RSS уже запущен отдельно (docker/ttrss/docker-compose.yml).
-## Этот файл подключается к его сети и добавляет аналитику.
+## TT-RSS + Аналитический стек (единый compose)
 ##
 ## Запуск:
 ##   docker compose up -d --build
 ##
 ## Интерфейсы:
+##   TT-RSS   → http://localhost:${TTRSS_PORT:-8080}
 ##   Shiny    → http://localhost:3838/ttrss
 ##   MCP      → http://localhost:8000/mcp
 ##   CH HTTP  → http://localhost:8123
 ## ============================================================
 
 networks:
-  # Существующая сеть TT-RSS — подключаемся как внешняя
   ttrss_default:
-    external: true
-  # Внутренняя сеть аналитики
+    driver: bridge
   analytics_net:
     driver: bridge
 
 volumes:
   clickhouse_data:
   clickhouse_logs:
+  ttrss_db_data:
+  ttrss_data:
 
 services:
 
-  # ── ClickHouse ────────────────────────────────────────────────────────────
+  # =========================================================================
+  # TT-RSS Stack
+  # =========================================================================
+
+  # ── PostgreSQL для TT-RSS ────────────────────────────────────────────────
+  ttrss-db:
+    image: postgres:15-alpine
+    container_name: ttrss-db
+    restart: unless-stopped
+    networks:
+      - ttrss_default
+    environment:
+      POSTGRES_USER:     ttrss
+      POSTGRES_PASSWORD: ${TTRSS_DB_PASSWORD:-ttrss_secret}
+      POSTGRES_DB:       ttrss
+    volumes:
+      - ttrss_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ttrss"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  # ── TT-RSS (PHP-FPM + Nginx + cron) ─────────────────────────────────────
+  ttrss:
+    image: wangqiru/ttrss:latest
+    container_name: ttrss
+    restart: unless-stopped
+    networks:
+      - ttrss_default
+    depends_on:
+      ttrss-db:
+        condition: service_healthy
+    ports:
+      - "${TTRSS_PORT:-8080}:80"
+    environment:
+      SELF_URL_PATH: http://localhost:${TTRSS_PORT:-8080}/
+      DB_HOST:       ttrss-db
+      DB_PORT:       5432
+      DB_NAME:       ttrss
+      DB_USER:       ttrss
+      DB_PASS:       ${TTRSS_DB_PASSWORD:-ttrss_secret}
+      ENABLE_PLUGINS: auth_internal,fever
+    volumes:
+      - ttrss_data:/var/www/html/tt-rss/feed-icons
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      interval: 10s
+      timeout:  5s
+      retries:  10
+      start_period: 30s
+
+  # ── Автоматическое включение API для admin ───────────────────────────────
+  ttrss-init:
+    image: postgres:15-alpine
+    container_name: ttrss-init
+    restart: "no"
+    networks:
+      - ttrss_default
+    depends_on:
+      ttrss:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${TTRSS_DB_PASSWORD:-ttrss_secret}
+    command: >
+      sh -c "
+        echo 'Waiting for TT-RSS schema...';
+        for i in \$$(seq 1 15); do
+          if psql -h ttrss-db -U ttrss -d ttrss -c \"SELECT 1 FROM ttrss_prefs LIMIT 1\" >/dev/null 2>&1; then
+            echo 'Schema ready.';
+            break;
+          fi;
+          echo \"Attempt \$$i/15: schema not ready, retrying...\";
+          sleep 2;
+        done;
+        echo 'Enabling API access for admin user...';
+        psql -h ttrss-db -U ttrss -d ttrss -c \"
+          INSERT INTO ttrss_prefs (owner_uid, pref_name, value, section_id)
+          VALUES (1, 'ENABLE_API_ACCESS', 'true', 1)
+          ON CONFLICT (owner_uid, pref_name) DO UPDATE SET value = 'true'
+        \";
+        echo 'API access enabled.'
+      "
+
+  # =========================================================================
+  # Analytics Stack
+  # =========================================================================
+
+  # ── ClickHouse ───────────────────────────────────────────────────────────
   clickhouse:
     image: clickhouse/clickhouse-server:24-alpine
     container_name: clickhouse
@@ -55,8 +141,9 @@ services:
         soft: 262144
         hard: 262144
 
-  # ── Shiny Dashboard ───────────────────────────────────────────────────────
+  # ── Shiny Dashboard ──────────────────────────────────────────────────────
   shiny:
+    platform: linux/amd64
     build:
       context:    .
       dockerfile: Dockerfile
@@ -87,11 +174,11 @@ services:
       YANDEX_CLOUD_FOLDER: ${YANDEX_CLOUD_FOLDER:-}
       YANDEX_CLOUD_MODEL: ${YANDEX_CLOUD_MODEL:-yandexgpt-5-lite/latest}
     volumes:
-      # Монтируем локальные данные в контейнер
       - ./data:/srv/shiny-server/ttrss/shiny/data:ro
 
-  # ── Scheduler (periodic fetch + write to ClickHouse) ───────────────────────
+  # ── Scheduler (periodic fetch + write to ClickHouse) ─────────────────────
   scheduler:
+    platform: linux/amd64
     image: ttrssr-shiny:latest
     container_name: ttrss-scheduler
     restart: unless-stopped
@@ -102,6 +189,8 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+      ttrss-init:
+        condition: service_completed_successfully
     environment:
       TTRSS_URL:       http://ttrss/
       TTRSS_USER:      ${TTRSS_ADMIN_USER:-admin}
@@ -182,8 +271,9 @@ services:
         sleep \"$${SCHEDULER_INTERVAL_SECONDS:-300}\";
       done"
 
-  # ── MCP Server ────────────────────────────────────────────────────────────
+  # ── MCP Server ───────────────────────────────────────────────────────────
   mcp:
+    platform: linux/amd64
     build:
       context:    .
       dockerfile: inst/mcp/Dockerfile

@@ -93,18 +93,16 @@ TT-RSS -> нормализация -> topic classification -> ClickHouse -> Shin
 
 ## 3. Docker-сервисы
 
-TT-RSS запускается отдельным compose-проектом из `docker/ttrss/docker-compose.yml`.
-
-Аналитический стек запускается из корня репозитория через основной `docker-compose.yml`.
+Все сервисы запускаются из единого `docker-compose.yml` в корне репозитория.
 
 | Сервис | Назначение |
 |---|---|
+| `ttrss-db` | PostgreSQL для TT-RSS |
+| `ttrss` | TT-RSS web UI и API |
 | `clickhouse` | аналитическое хранилище |
 | `scheduler` | периодический запуск `fetch_news.R`; основной ingestion path |
 | `shiny` | UI-дашборд |
 | `mcp` | JSON-RPC endpoint с MCP-инструментами |
-| `ttrss` | TT-RSS web UI и API, отдельный compose-проект |
-| `ttrss-db` | PostgreSQL для TT-RSS, отдельный compose-проект |
 
 ---
 
@@ -173,11 +171,11 @@ news-ai-aggregator/
 │   ├── test-classify.R
 │   └── test-ground-truth.R
 │
-├── docker/ttrss/
-│   └── docker-compose.yml            # отдельный стек TT-RSS + PostgreSQL
+├── docker/
+│   └── shiny-server.conf              # конфигурация Shiny Server
 │
-├── docker-compose.yml                # analytics stack: CH + scheduler + Shiny + MCP
-├── .env.example                      # шаблон переменных окружения
+├── docker-compose.yml                  # весь стек: TT-RSS + PostgreSQL + ClickHouse + Shiny + MCP + scheduler
+├── .env.example                        # шаблон переменных окружения
 └── README.md
 ```
 
@@ -518,12 +516,14 @@ RUN_ADD_FEEDS_EACH_CYCLE=false
 
 ## 10. Clean start: рекомендуемый запуск
 
-Из корня репозитория:
+Из корня репозитория одной командой:
 
 ```bash
-# 1. Запустить TT-RSS stack
-docker compose -p ttrss -f docker/ttrss/docker-compose.yml up -d
+docker compose up -d --build
 ```
+
+Эта команда запускает сразу все сервисы: TT-RSS, PostgreSQL, ClickHouse, scheduler, Shiny и MCP.
+
 ### ОБЯЗАТЕЛЬНО:
 ---
 
@@ -559,25 +559,14 @@ admin / password
 API_DISABLED
 ```
 
-### Включение оставшихся контейнеров:
-```bash
-# 2. Запустить основной ingestion-контур
-docker compose up -d --build
-# ЛИБО Если не нужны dashboard и MCP endpoint:
-#docker compose up -d --build scheduler
-```
-
-Проверка контейнеров:
+### Проверка контейнеров:
 
 ```bash
 docker compose ps
 docker ps
 ```
 
-Ожидаемо должны быть запущены:
-
-- TT-RSS stack: `ttrss`, `ttrss-db`;
-- analytics stack: `clickhouse`, `scheduler`, опционально `shiny`, `mcp`.
+Ожидаемо должны быть запущены все 6 сервисов: `ttrss-db`, `ttrss`, `clickhouse`, `scheduler`, `shiny`, `mcp`.
 
 
 ---
@@ -866,7 +855,7 @@ Rscript data-raw/fetch_news.R
 Используйте этот сценарий, когда нужно проверить восстановление с нуля после удаления ClickHouse volume.
 
 ```bash
-# Остановить analytics stack и удалить volumes
+# Остановить все сервисы и удалить volumes
 
 docker compose down -v --remove-orphans
 
@@ -889,7 +878,7 @@ docker exec -it clickhouse clickhouse-client --database ttrss --query "SHOW TABL
 docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT count() FROM articles FINAL"
 ```
 
-Важно: команда выше сбрасывает volume основного analytics stack. TT-RSS находится в отдельном compose-проекте `ttrss`, поэтому его данные не должны удаляться этим вызовом из корня репозитория. Для сброса TT-RSS нужно отдельно выполнять команды с `-p ttrss -f docker/ttrss/docker-compose.yml`.
+Важно: `docker compose down -v` сбрасывает все volumes. Если нужно сбросить только analytics и сохранить данные TT-RSS, используйте `docker compose down -v clickhouse shiny scheduler mcp`.
 
 ---
 
