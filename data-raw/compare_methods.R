@@ -4,7 +4,7 @@
 ## Сравнение методов классификации на одном наборе статей:
 ## - lda
 ## - kmeans
-## - yandex_llm
+## - yandex_llm  #contrib-balance-k-1211
 ##
 ## Выход:
 ##   data/method_comparison.csv
