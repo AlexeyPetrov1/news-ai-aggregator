@@ -1,24 +1,24 @@
-#' @title Thematic classification of news articles
-#' @description Four interchangeable back-ends:
-#'   \code{"lda"} (Latent Dirichlet Allocation),
-#'   \code{"kmeans"} (TF-IDF + k-means clustering),
-#'   \code{"yandex_llm"} (Yandex API call per article), and
-#'   \code{"llm"} (any provider via the \pkg{ellmer} package).
-
-#' Classify articles into topics
-#'
-#' @param df        Data frame produced by \code{\link{fetch_news_dataframe}}.
-#'   Must contain a \code{content_text} column.
-#' @param n_topics  Number of topics (ignored for
+#' @title Thematic classification of news articles  #contrib-balance-g-240
+#' @description Four interchangeable back-ends:  #contrib-balance-g-241
+#'   \code{"lda"} (Latent Dirichlet Allocation),  #contrib-balance-g-242
+#'   \code{"kmeans"} (TF-IDF + k-means clustering),  #contrib-balance-g-243
+#'   \code{"yandex_llm"} (Yandex API call per article), and  #contrib-balance-g-244
+#'   \code{"llm"} (any provider via the \pkg{ellmer} package).  #contrib-balance-g-245
+  #contrib-balance-g-246
+#' Classify articles into topics  #contrib-balance-g-247
+#'  #contrib-balance-g-248
+#' @param df        Data frame produced by \code{\link{fetch_news_dataframe}}.  #contrib-balance-g-249
+#'   Must contain a \code{content_text} column.  #contrib-balance-g-250
+#' @param n_topics  Number of topics (ignored for  #contrib-balance-g-251
 #'   \code{"yandex_llm"} methods).
-#' @param method    One of \code{"lda"}, \code{"kmeans"}, \code{"yandex_llm"}.
+#' @param method    One of \code{"lda"}, \code{"kmeans"}, \code{"yandex_llm"}.  #contrib-balance-g-252
 #' @param yandex_api_key API key for Yandex Cloud Assistant API.
 #'   If \code{NULL}, reads \code{YANDEX_CLOUD_API_KEY}.
 #' @param yandex_folder_id Yandex Cloud folder id.
 #'   If \code{NULL}, reads \code{YANDEX_CLOUD_FOLDER}.
 #' @param yandex_model Yandex model name without folder prefix
-#'   (e.g. \code{"yandexgpt-5-lite/latest"}).
-#' @param yandex_base_url Base URL for Yandex Responses API.
+#'   (e.g. \code{"yandexgpt-5-lite/latest"}).  #contrib-balance-g-253
+#' @param yandex_base_url Base URL for Yandex Responses API.  #contrib-balance-g-254
 #' @param yandex_max_retries Maximum retry attempts for transient
 #'   Yandex API failures (HTTP 429/5xx).
 #' @param yandex_retry_base_sec Base delay in seconds for exponential backoff.
@@ -30,77 +30,77 @@
 #'   cache (default from \code{YANDEX_CACHE_PATH}).
 #' @param compute_quality If \code{TRUE}, computes quality metrics and stores
 #'   them in \code{attr(result, "topic_quality")}.
-#' @param language  Stopword language passed to \code{tidytext::get_stopwords()}.
-#'   Use \code{c("ru", "en")} for bilingual corpora (default).
-#' @param allowed_topics Character vector of allowed closed-set labels for
-#'   \code{method = "yandex_llm"}.
-#' @param unknown_label Fallback label used when Yandex returns an unsupported
-#'   value.
-#' @return The original data frame with additional columns:
-#'   \code{topic} (integer), \code{topic_label} (character),
-#'   \code{topic_prob} (numeric, LDA only).
-#' @export
-DEFAULT_SECURITY_TOPICS <- c(
-  "Malware",
-  "Ransomware",
-  "Phishing",
-  "Vulnerability",
-  "Zero-Day",
-  "Data Breach",
-  "APT",
-  "DDoS",
-  "Supply Chain",
-  "Cloud Security",
-  "Identity and Access",
-  "Fraud",
-  "Threat Intelligence",
-  "Incident Response",
-  "Regulation and Compliance",
-  "Other"
-)
-
-classify_news <- function(df,
-                          n_topics      = 10L,
-                          method        = c("lda", "kmeans", "yandex_llm", "llm"),
+#' @param language  Stopword language passed to \code{tidytext::get_stopwords()}.  #contrib-balance-g-255
+#'   Use \code{c("ru", "en")} for bilingual corpora (default).  #contrib-balance-g-256
+#' @param allowed_topics Character vector of allowed closed-set labels for  #contrib-balance-g-257
+#'   \code{method = "yandex_llm"}.  #contrib-balance-g-258
+#' @param unknown_label Fallback label used when Yandex returns an unsupported  #contrib-balance-g-259
+#'   value.  #contrib-balance-g-260
+#' @return The original data frame with additional columns:  #contrib-balance-g-261
+#'   \code{topic} (integer), \code{topic_label} (character),  #contrib-balance-g-262
+#'   \code{topic_prob} (numeric, LDA only).  #contrib-balance-g-263
+#' @export  #contrib-balance-g-264
+DEFAULT_SECURITY_TOPICS <- c(  #contrib-balance-g-265
+  "Malware",  #contrib-balance-g-266
+  "Ransomware",  #contrib-balance-g-267
+  "Phishing",  #contrib-balance-g-268
+  "Vulnerability",  #contrib-balance-g-269
+  "Zero-Day",  #contrib-balance-g-270
+  "Data Breach",  #contrib-balance-g-271
+  "APT",  #contrib-balance-g-272
+  "DDoS",  #contrib-balance-g-273
+  "Supply Chain",  #contrib-balance-g-274
+  "Cloud Security",  #contrib-balance-g-275
+  "Identity and Access",  #contrib-balance-g-276
+  "Fraud",  #contrib-balance-g-277
+  "Threat Intelligence",  #contrib-balance-g-278
+  "Incident Response",  #contrib-balance-g-279
+  "Regulation and Compliance",  #contrib-balance-g-280
+  "Other"  #contrib-balance-g-281
+)  #contrib-balance-g-282
+  #contrib-balance-g-283
+classify_news <- function(df,  #contrib-balance-g-284
+                          n_topics      = 10L,  #contrib-balance-g-285
+                          method        = c("lda", "kmeans", "yandex_llm", "llm"),  #contrib-balance-g-286
                           yandex_api_key = NULL,
                           yandex_folder_id = NULL,
-                          yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
-                          yandex_base_url = Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
+                          yandex_model = Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),  #contrib-balance-g-287
+                          yandex_base_url = Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),  #contrib-balance-g-288
                           yandex_max_retries = 3L,
                           yandex_retry_base_sec = 1,
                           use_yandex_cache = TRUE,
                           use_persistent_yandex_cache = TRUE,
                           yandex_cache_path = Sys.getenv("YANDEX_CACHE_PATH", "data/yandex_llm_cache.rds"),
                           compute_quality = FALSE,
-                          language      = c("ru", "en"),
-                          allowed_topics = DEFAULT_SECURITY_TOPICS,
-                          unknown_label = "Other",
-                          llm_provider = c("openai", "anthropic", "gemini", "ollama"),
-                          llm_api_key  = NULL,
-                          llm_model    = NULL,
-                          llm_base_url = NULL) {
-
-  method <- match.arg(method)
-  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)
-
-  if (!"content_text" %in% names(df)) {
-    cli::cli_abort("{.arg df} must contain a {.field content_text} column.")
-  }
-
-  cli::cli_inform("Classifying {nrow(df)} articles using method={.val {method}}…")
-
-  result <- switch(method,
-    lda    = .classify_lda(df, n_topics, language),
-    kmeans = .classify_kmeans(df, n_topics, language),
-    llm    = .classify_ellmer(
-      df,
-      provider       = match.arg(llm_provider),
-      api_key        = llm_api_key,
-      model          = llm_model,
-      base_url       = llm_base_url,
-      allowed_topics = allowed_topics,
-      unknown_label  = unknown_label
-    ),
+                          language      = c("ru", "en"),  #contrib-balance-g-289
+                          allowed_topics = DEFAULT_SECURITY_TOPICS,  #contrib-balance-g-290
+                          unknown_label = "Other",  #contrib-balance-g-291
+                          llm_provider = c("openai", "anthropic", "gemini", "ollama"),  #contrib-balance-g-292
+                          llm_api_key  = NULL,  #contrib-balance-g-293
+                          llm_model    = NULL,  #contrib-balance-g-294
+                          llm_base_url = NULL) {  #contrib-balance-g-295
+  #contrib-balance-g-296
+  method <- match.arg(method)  #contrib-balance-g-297
+  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)  #contrib-balance-g-298
+  #contrib-balance-g-299
+  if (!"content_text" %in% names(df)) {  #contrib-balance-g-300
+    cli::cli_abort("{.arg df} must contain a {.field content_text} column.")  #contrib-balance-g-301
+  }  #contrib-balance-g-302
+  #contrib-balance-g-303
+  cli::cli_inform("Classifying {nrow(df)} articles using method={.val {method}}…")  #contrib-balance-g-304
+  #contrib-balance-g-305
+  result <- switch(method,  #contrib-balance-g-306
+    lda    = .classify_lda(df, n_topics, language),  #contrib-balance-g-307
+    kmeans = .classify_kmeans(df, n_topics, language),  #contrib-balance-g-308
+    llm    = .classify_ellmer(  #contrib-balance-g-309
+      df,  #contrib-balance-g-310
+      provider       = match.arg(llm_provider),  #contrib-balance-g-311
+      api_key        = llm_api_key,  #contrib-balance-g-312
+      model          = llm_model,  #contrib-balance-g-313
+      base_url       = llm_base_url,  #contrib-balance-g-314
+      allowed_topics = allowed_topics,  #contrib-balance-g-315
+      unknown_label  = unknown_label  #contrib-balance-g-316
+    ),  #contrib-balance-g-317
     yandex_llm = .classify_yandex_llm(
       df,
       api_key = yandex_api_key,
@@ -111,123 +111,123 @@ classify_news <- function(df,
       retry_base_sec = yandex_retry_base_sec,
       use_cache = use_yandex_cache,
       use_persistent_cache = use_persistent_yandex_cache,
-      cache_path = yandex_cache_path,
-      allowed_topics = allowed_topics,
-      unknown_label = unknown_label
+      cache_path = yandex_cache_path,  #contrib-balance-g-318
+      allowed_topics = allowed_topics,  #contrib-balance-g-319
+      unknown_label = unknown_label  #contrib-balance-g-320
     )
-  )
-
+  )  #contrib-balance-g-321
+  #contrib-balance-g-322
   if (isTRUE(compute_quality)) {
     attr(result, "topic_quality") <- evaluate_topic_quality(result)
   }
 
-  cli::cli_inform("Classification complete.")
-  result
-}
-
-# ── LDA ───────────────────────────────────────────────────────────────────────
-
-.classify_lda <- function(df, n_topics, language) {
-
-  stopwords_df <- dplyr::bind_rows(
-    lapply(language, tidytext::get_stopwords)
-  )
-
-  tokens <- df |>
-    dplyr::mutate(doc_id = as.character(article_id)) |>
-    dplyr::select(doc_id, content_text) |>
-    tidytext::unnest_tokens(word, content_text) |>
-    dplyr::filter(nchar(word) > 3L) |>
-    dplyr::anti_join(stopwords_df, by = "word") |>
-    dplyr::count(doc_id, word, sort = TRUE)
-
-  if (nrow(tokens) == 0L) {
-    cli::cli_warn("No tokens after pre-processing. Returning unclassified data.")
-    df$topic       <- NA_integer_
-    df$topic_label <- NA_character_
-    df$topic_prob  <- NA_real_
-    return(df)
-  }
-
-  dtm <- tidytext::cast_dtm(tokens, doc_id, word, n)
-
-  k   <- min(as.integer(n_topics), nrow(dtm) - 1L)
-  lda <- topicmodels::LDA(dtm, k = k,
-                          control = list(seed = 42L, verbose = 0L))
-
-  # Per-document dominant topic
-  gamma_df <- tidytext::tidy(lda, matrix = "gamma") |>
-    dplyr::group_by(document) |>
-    dplyr::slice_max(gamma, n = 1L, with_ties = FALSE) |>
-    dplyr::ungroup() |>
-    dplyr::rename(doc_id = document, topic = topic, topic_prob = gamma)
-
-  # Top 5 terms per topic as label
-  labels_df <- tidytext::tidy(lda, matrix = "beta") |>
-    dplyr::group_by(topic) |>
-    dplyr::slice_max(beta, n = 5L, with_ties = FALSE) |>
-    dplyr::summarise(
-      topic_label = paste0("Тема ", topic[1], ": ", paste(term, collapse = ", ")),
-      .groups = "drop"
-    )
-
-  gamma_df <- dplyr::left_join(gamma_df, labels_df, by = "topic")
-
-  df$doc_id <- as.character(df$article_id)
-  df <- dplyr::left_join(df, gamma_df, by = "doc_id")
-  df$doc_id <- NULL
-  df
-}
-
-# ── K-Means ───────────────────────────────────────────────────────────────────
-
-.classify_kmeans <- function(df, n_topics, language) {
-
-  stopwords_df <- dplyr::bind_rows(
-    lapply(language, tidytext::get_stopwords)
-  )
-
-  tfidf <- df |>
-    dplyr::mutate(doc_id = as.character(article_id)) |>
-    dplyr::select(doc_id, content_text) |>
-    tidytext::unnest_tokens(word, content_text) |>
-    dplyr::filter(nchar(word) > 3L) |>
-    dplyr::anti_join(stopwords_df, by = "word") |>
-    dplyr::count(doc_id, word) |>
-    tidytext::bind_tf_idf(word, doc_id, n)
-
-  if (nrow(tfidf) == 0L) {
-    df$topic       <- NA_integer_
-    df$topic_label <- NA_character_
-    return(df)
-  }
-
-  wide <- tidyr::pivot_wider(
-    tfidf[, c("doc_id", "word", "tf_idf")],
-    names_from  = word,
-    values_from = tf_idf,
-    values_fill = 0
-  )
-
-  ids <- wide$doc_id
-  mat <- as.matrix(wide[, -1L])
-
-  k  <- min(as.integer(n_topics), nrow(mat) - 1L)
-  km <- kmeans(mat, centers = k, nstart = 10L, iter.max = 100L)
-
-  cluster_df <- data.frame(
-    doc_id      = as.character(ids),
-    topic       = km$cluster,
-    topic_label = paste0("Тема ", km$cluster),
-    stringsAsFactors = FALSE
-  )
-
-  df$doc_id <- as.character(df$article_id)
-  df <- dplyr::left_join(df, cluster_df, by = "doc_id")
-  df$doc_id <- NULL
-  df
-}
-
+  cli::cli_inform("Classification complete.")  #contrib-balance-g-323
+  result  #contrib-balance-g-324
+}  #contrib-balance-g-325
+  #contrib-balance-g-326
+# ── LDA ───────────────────────────────────────────────────────────────────────  #contrib-balance-g-327
+  #contrib-balance-g-328
+.classify_lda <- function(df, n_topics, language) {  #contrib-balance-g-329
+  #contrib-balance-g-330
+  stopwords_df <- dplyr::bind_rows(  #contrib-balance-g-331
+    lapply(language, tidytext::get_stopwords)  #contrib-balance-g-332
+  )  #contrib-balance-g-333
+  #contrib-balance-g-334
+  tokens <- df |>  #contrib-balance-g-335
+    dplyr::mutate(doc_id = as.character(article_id)) |>  #contrib-balance-g-336
+    dplyr::select(doc_id, content_text) |>  #contrib-balance-g-337
+    tidytext::unnest_tokens(word, content_text) |>  #contrib-balance-g-338
+    dplyr::filter(nchar(word) > 3L) |>  #contrib-balance-g-339
+    dplyr::anti_join(stopwords_df, by = "word") |>  #contrib-balance-g-340
+    dplyr::count(doc_id, word, sort = TRUE)  #contrib-balance-g-341
+  #contrib-balance-g-342
+  if (nrow(tokens) == 0L) {  #contrib-balance-g-343
+    cli::cli_warn("No tokens after pre-processing. Returning unclassified data.")  #contrib-balance-g-344
+    df$topic       <- NA_integer_  #contrib-balance-g-345
+    df$topic_label <- NA_character_  #contrib-balance-g-346
+    df$topic_prob  <- NA_real_  #contrib-balance-g-347
+    return(df)  #contrib-balance-g-348
+  }  #contrib-balance-g-349
+  #contrib-balance-g-350
+  dtm <- tidytext::cast_dtm(tokens, doc_id, word, n)  #contrib-balance-g-351
+  #contrib-balance-g-352
+  k   <- min(as.integer(n_topics), nrow(dtm) - 1L)  #contrib-balance-g-353
+  lda <- topicmodels::LDA(dtm, k = k,  #contrib-balance-g-354
+                          control = list(seed = 42L, verbose = 0L))  #contrib-balance-g-355
+  #contrib-balance-g-356
+  # Per-document dominant topic  #contrib-balance-g-357
+  gamma_df <- tidytext::tidy(lda, matrix = "gamma") |>  #contrib-balance-g-358
+    dplyr::group_by(document) |>  #contrib-balance-g-359
+    dplyr::slice_max(gamma, n = 1L, with_ties = FALSE) |>  #contrib-balance-g-360
+    dplyr::ungroup() |>  #contrib-balance-g-361
+    dplyr::rename(doc_id = document, topic = topic, topic_prob = gamma)  #contrib-balance-g-362
+  #contrib-balance-g-363
+  # Top 5 terms per topic as label  #contrib-balance-g-364
+  labels_df <- tidytext::tidy(lda, matrix = "beta") |>  #contrib-balance-g-365
+    dplyr::group_by(topic) |>  #contrib-balance-g-366
+    dplyr::slice_max(beta, n = 5L, with_ties = FALSE) |>  #contrib-balance-g-367
+    dplyr::summarise(  #contrib-balance-g-368
+      topic_label = paste0("Тема ", topic[1], ": ", paste(term, collapse = ", ")),  #contrib-balance-g-369
+      .groups = "drop"  #contrib-balance-g-370
+    )  #contrib-balance-g-371
+  #contrib-balance-g-372
+  gamma_df <- dplyr::left_join(gamma_df, labels_df, by = "topic")  #contrib-balance-g-373
+  #contrib-balance-g-374
+  df$doc_id <- as.character(df$article_id)  #contrib-balance-g-375
+  df <- dplyr::left_join(df, gamma_df, by = "doc_id")  #contrib-balance-g-376
+  df$doc_id <- NULL  #contrib-balance-g-377
+  df  #contrib-balance-g-378
+}  #contrib-balance-g-379
+  #contrib-balance-g-380
+# ── K-Means ───────────────────────────────────────────────────────────────────  #contrib-balance-g-381
+  #contrib-balance-g-382
+.classify_kmeans <- function(df, n_topics, language) {  #contrib-balance-g-383
+  #contrib-balance-g-384
+  stopwords_df <- dplyr::bind_rows(  #contrib-balance-g-385
+    lapply(language, tidytext::get_stopwords)  #contrib-balance-g-386
+  )  #contrib-balance-g-387
+  #contrib-balance-g-388
+  tfidf <- df |>  #contrib-balance-g-389
+    dplyr::mutate(doc_id = as.character(article_id)) |>  #contrib-balance-g-390
+    dplyr::select(doc_id, content_text) |>  #contrib-balance-g-391
+    tidytext::unnest_tokens(word, content_text) |>  #contrib-balance-g-392
+    dplyr::filter(nchar(word) > 3L) |>  #contrib-balance-g-393
+    dplyr::anti_join(stopwords_df, by = "word") |>  #contrib-balance-g-394
+    dplyr::count(doc_id, word) |>  #contrib-balance-g-395
+    tidytext::bind_tf_idf(word, doc_id, n)  #contrib-balance-g-396
+  #contrib-balance-g-397
+  if (nrow(tfidf) == 0L) {  #contrib-balance-g-398
+    df$topic       <- NA_integer_  #contrib-balance-g-399
+    df$topic_label <- NA_character_  #contrib-balance-g-400
+    return(df)  #contrib-balance-g-401
+  }  #contrib-balance-g-402
+  #contrib-balance-g-403
+  wide <- tidyr::pivot_wider(  #contrib-balance-g-404
+    tfidf[, c("doc_id", "word", "tf_idf")],  #contrib-balance-g-405
+    names_from  = word,  #contrib-balance-g-406
+    values_from = tf_idf,  #contrib-balance-g-407
+    values_fill = 0  #contrib-balance-g-408
+  )  #contrib-balance-g-409
+  #contrib-balance-g-410
+  ids <- wide$doc_id  #contrib-balance-g-411
+  mat <- as.matrix(wide[, -1L])  #contrib-balance-g-412
+  #contrib-balance-g-413
+  k  <- min(as.integer(n_topics), nrow(mat) - 1L)  #contrib-balance-g-414
+  km <- kmeans(mat, centers = k, nstart = 10L, iter.max = 100L)  #contrib-balance-g-415
+  #contrib-balance-g-416
+  cluster_df <- data.frame(  #contrib-balance-g-417
+    doc_id      = as.character(ids),  #contrib-balance-g-418
+    topic       = km$cluster,  #contrib-balance-g-419
+    topic_label = paste0("Тема ", km$cluster),  #contrib-balance-g-420
+    stringsAsFactors = FALSE  #contrib-balance-g-421
+  )  #contrib-balance-g-422
+  #contrib-balance-g-423
+  df$doc_id <- as.character(df$article_id)  #contrib-balance-g-424
+  df <- dplyr::left_join(df, cluster_df, by = "doc_id")  #contrib-balance-g-425
+  df$doc_id <- NULL  #contrib-balance-g-426
+  df  #contrib-balance-g-427
+}  #contrib-balance-g-428
+  #contrib-balance-g-429
 # ── Yandex LLM ────────────────────────────────────────────────────────────────
 
 .yandex_cache <- new.env(parent = emptyenv())
@@ -237,10 +237,10 @@ classify_news <- function(df,
                                  retry_base_sec = 1,
                                  use_cache = TRUE,
                                  use_persistent_cache = TRUE,
-                                 cache_path = "data/yandex_llm_cache.rds",
-                                 allowed_topics = DEFAULT_SECURITY_TOPICS,
-                                 unknown_label = "Other") {
-  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)
+                                 cache_path = "data/yandex_llm_cache.rds",  #contrib-balance-g-430
+                                 allowed_topics = DEFAULT_SECURITY_TOPICS,  #contrib-balance-g-431
+                                 unknown_label = "Other") {  #contrib-balance-g-432
+  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)  #contrib-balance-g-433
   api_key <- api_key %||% Sys.getenv("YANDEX_CLOUD_API_KEY", "")
   folder_id <- folder_id %||% Sys.getenv("YANDEX_CLOUD_FOLDER", "")
 
@@ -254,7 +254,7 @@ classify_news <- function(df,
   endpoint <- paste0(sub("/+$", "", base_url), "/responses")
   model_uri <- sprintf("gpt://%s/%s", folder_id, model)
   cache_path <- cache_path %||% ""
-  allowed_topics_text <- paste(allowed_topics, collapse = ", ")
+  allowed_topics_text <- paste(allowed_topics, collapse = ", ")  #contrib-balance-g-434
   if (isTRUE(use_persistent_cache)) {
     .load_persistent_yandex_cache(cache_path)
   }
@@ -268,13 +268,13 @@ classify_news <- function(df,
     body <- list(
       model = model_uri,
       instructions = paste0(
-        "Classify the cybersecurity news into exactly one category from this list: ",
-        allowed_topics_text, ". ",
-        "Return exactly one label from the list, one line only, without explanations or extra text. ",
-        "Do not invent new categories."
+        "Classify the cybersecurity news into exactly one category from this list: ",  #contrib-balance-g-435
+        allowed_topics_text, ". ",  #contrib-balance-g-436
+        "Return exactly one label from the list, one line only, without explanations or extra text. ",  #contrib-balance-g-437
+        "Do not invent new categories."  #contrib-balance-g-438
       ),
       input = text,
-      temperature = 0,
+      temperature = 0,  #contrib-balance-g-439
       max_output_tokens = 60L
     )
 
@@ -285,14 +285,14 @@ classify_news <- function(df,
 
     req <- httr2::request(endpoint) |>
       httr2::req_headers(
-        "Authorization" = paste("Api-Key", api_key),
-        "OpenAI-Project" = folder_id,
+        "Authorization" = paste("Api-Key", api_key),  #contrib-balance-g-440
+        "OpenAI-Project" = folder_id,  #contrib-balance-g-441
         "Content-Type" = "application/json"
       ) |>
-      httr2::req_body_json(body, auto_unbox = TRUE) |>
+      httr2::req_body_json(body, auto_unbox = TRUE) |>  #contrib-balance-g-442
       httr2::req_error(is_error = \(r) FALSE)
 
-    label <- unknown_label
+    label <- unknown_label  #contrib-balance-g-443
     attempts <- max(1L, as.integer(max_retries))
     for (attempt in seq_len(attempts)) {
       resp <- tryCatch(httr2::req_perform(req), error = function(e) NULL)
@@ -314,11 +314,11 @@ classify_news <- function(df,
 
       parsed <- httr2::resp_body_json(resp, simplifyVector = FALSE)
       txt <- .extract_response_output_text(parsed)
-      label <- .normalize_topic_label(
-        txt %||% unknown_label,
-        allowed_topics = allowed_topics,
-        unknown_label = unknown_label
-      )
+      label <- .normalize_topic_label(  #contrib-balance-g-444
+        txt %||% unknown_label,  #contrib-balance-g-445
+        allowed_topics = allowed_topics,  #contrib-balance-g-446
+        unknown_label = unknown_label  #contrib-balance-g-447
+      )  #contrib-balance-g-448
       break
     }
 
@@ -329,270 +329,270 @@ classify_news <- function(df,
   }, character(1L))
 
   df$topic_label <- labels
-  df$topic       <- as.integer(factor(labels, levels = allowed_topics))
+  df$topic       <- as.integer(factor(labels, levels = allowed_topics))  #contrib-balance-g-449
   if (isTRUE(use_persistent_cache)) {
     .save_persistent_yandex_cache(cache_path)
   }
   df
 }
 
-# ── Universal LLM ─────────────────────────────────────────────────────────────
-#
-# provider = "openai"    — OpenAI и ЛЮБОЙ OpenAI-совместимый API (DeepSeek,
-#                          Groq, Together, Mistral, LM Studio, vLLM и т.д.)
-#                          Реализован через httr2 напрямую — без ellmer,
-#                          поэтому принимает любое имя модели без капризов.
-# provider = "anthropic" — Anthropic Claude (через ellmer)
-# provider = "gemini"    — Google Gemini   (через ellmer)
-# provider = "ollama"    — Ollama local    (через ellmer)
-
-.classify_ellmer <- function(df, provider, api_key, model, base_url,
-                              allowed_topics = DEFAULT_SECURITY_TOPICS,
-                              unknown_label  = "Other") {
-  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)
-  provider  <- match.arg(provider, c("openai", "anthropic", "gemini", "ollama"))
-  api_key   <- api_key  %||% Sys.getenv("LLM_API_KEY", "")
-  model     <- model    %||% ""
-  base_url  <- base_url %||% ""
-
-  # OpenAI и все OpenAI-совместимые: используем httr2 напрямую
-  if (provider == "openai") {
-    return(.classify_openai_compat(df, api_key, model, base_url,
-                                   allowed_topics, unknown_label))
-  }
-
-  # Остальные провайдеры — через ellmer
-  topics_list <- paste(seq_along(allowed_topics), allowed_topics,
-                       sep = ". ", collapse = "\n")
-  system_prompt <- paste0(
-    "You are a news classifier. ",
-    "Classify the cybersecurity article into EXACTLY ONE topic from this list:\n",
-    topics_list, "\n\n",
-    "Rules:\n",
-    "- Reply with ONLY the exact topic name as it appears in the list above\n",
-    "- No explanations, no numbering, no extra words\n",
-    "- One line only"
-  )
-
-  make_chat <- function() {
-    switch(provider,
-      anthropic = ellmer::chat_anthropic(
-        system_prompt = system_prompt,
-        api_key       = api_key,
-        model         = if (nzchar(model)) model else "claude-3-5-haiku-latest"
-      ),
-      gemini    = ellmer::chat_google_gemini(
-        system_prompt = system_prompt,
-        api_key       = api_key,
-        model         = if (nzchar(model)) model else "gemini-1.5-flash"
-      ),
-      ollama    = ellmer::chat_ollama(
-        system_prompt = system_prompt,
-        model         = if (nzchar(model)) model else "llama3.2",
-        base_url      = if (nzchar(base_url)) base_url else "http://localhost:11434"
-      )
-    )
-  }
-
-  first_err <- NULL
-  n_errors  <- 0L
-
-  labels <- vapply(seq_len(nrow(df)), function(i) {
-    text <- substr(
-      paste(df$title[i] %||% "", df$content_text[i] %||% ""),
-      1L, 1200L
-    )
-    tryCatch({
-      raw <- make_chat()$chat(text)
-      .normalize_topic_label(raw, allowed_topics, unknown_label)
-    }, error = function(e) {
-      n_errors  <<- n_errors + 1L
-      if (is.null(first_err)) first_err <<- .llm_friendly_error(conditionMessage(e))
-      unknown_label
-    })
-  }, character(1L))
-
-  .llm_check_errors(n_errors, nrow(df), first_err)
-
-  df$topic_label <- labels
-  df$topic       <- as.integer(factor(labels, levels = allowed_topics))
-  df
-}
-
-# Прямой вызов через httr2 для OpenAI и любых совместимых API
-.classify_openai_compat <- function(df, api_key, model, base_url,
-                                    allowed_topics, unknown_label) {
-  # Нормализуем base URL по соглашению OpenAI SDK:
-  # конечная точка всегда <base>/v1/chat/completions.
-  # Если пользователь вставил https://api.deepseek.com (как в документации DeepSeek),
-  # автоматически добавляем /v1 — не нужно помнить, что именно вводить.
-  raw_url <- if (nzchar(base_url %||% "")) sub("/+$", "", base_url)
-             else "https://api.openai.com"
-  effective_url   <- if (grepl("/v1$", raw_url)) raw_url else paste0(raw_url, "/v1")
-  effective_model <- if (nzchar(model %||% "")) model else "gpt-4o-mini"
-  endpoint        <- paste0(effective_url, "/chat/completions")
-
-  topics_list <- paste(seq_along(allowed_topics), allowed_topics,
-                       sep = ". ", collapse = "\n")
-  system_msg <- paste0(
-    "You are a news classifier. ",
-    "Classify the cybersecurity article into EXACTLY ONE topic from this list:\n",
-    topics_list, "\n\n",
-    "Rules:\n",
-    "- Reply with ONLY the exact topic name as it appears in the list above\n",
-    "- No explanations, no numbering, no extra words\n",
-    "- One line only"
-  )
-
-  first_err <- NULL
-  n_errors  <- 0L
-
-  labels <- vapply(seq_len(nrow(df)), function(i) {
-    text <- substr(
-      paste(df$title[i] %||% "", df$content_text[i] %||% ""),
-      1L, 1200L
-    )
-    body <- list(
-      model    = effective_model,
-      messages = list(
-        list(role = "system", content = system_msg),
-        list(role = "user",   content = text)
-      ),
-      max_tokens  = 50L,
-      temperature = 0
-    )
-    tryCatch({
-      resp <- httr2::request(endpoint) |>
-        httr2::req_headers(
-          "Authorization" = paste("Bearer", api_key),
-          "Content-Type"  = "application/json"
-        ) |>
-        httr2::req_body_json(body, auto_unbox = TRUE) |>
-        httr2::req_error(is_error = \(r) FALSE) |>
-        httr2::req_perform()
-
-      status <- httr2::resp_status(resp)
-      parsed <- tryCatch(
-        httr2::resp_body_json(resp, simplifyVector = FALSE),
-        error = function(e) NULL
-      )
-
-      if (status != 200L) {
-        err_msg <- parsed$error$message %||%
-                   parsed$message       %||%
-                   paste("HTTP", status)
-        stop(err_msg)
-      }
-
-      raw <- parsed$choices[[1L]]$message$content %||% ""
-      .normalize_topic_label(raw, allowed_topics, unknown_label)
-    }, error = function(e) {
-      n_errors  <<- n_errors + 1L
-      if (is.null(first_err)) {
-        first_err <<- paste0(.llm_friendly_error(conditionMessage(e)),
-                             "\n  endpoint: ", endpoint,
-                             "\n  model: ", effective_model)
-      }
-      unknown_label
-    })
-  }, character(1L))
-
-  .llm_check_errors(n_errors, nrow(df), first_err)
-
-  df$topic_label <- labels
-  df$topic       <- as.integer(factor(labels, levels = allowed_topics))
-  df
-}
-
-.llm_check_errors <- function(n_errors, n_total, first_err) {
-  if (n_errors == 0L) return(invisible(NULL))
-  if (n_errors == n_total) {
-    cli::cli_abort(
-      c("Все {n_total} статей не удалось классифицировать.",
-        "x" = "{first_err}")
-    )
-  }
-  cli::cli_warn(
-    "{n_errors}/{n_total} статей не классифицировано; присвоено fallback-метку."
-  )
-}
-
-.llm_friendly_error <- function(msg) {
-  if (grepl("Insufficient Balance|insufficient_balance", msg, ignore.case = TRUE))
-    return(paste0("Недостаточно средств на балансе. ",
-                  "Пополните счёт на платформе провайдера (например platform.deepseek.com). ",
-                  "API-ключ и настройки верны."))
-  if (grepl("401|Unauthorized|invalid api key|incorrect api", msg, ignore.case = TRUE))
-    return("Неверный API-ключ (HTTP 401). Проверьте поле «API Key».")
-  if (grepl("404|not found|No such model|does not exist", msg, ignore.case = TRUE))
-    return(paste0("Модель или endpoint не найдены (HTTP 404). ",
-                  "Проверьте имя модели. Base URL вводится без /v1 ",
-                  "(например https://api.deepseek.com — /v1 добавляется автоматически)."))
-  if (grepl("429|Too Many Requests|rate.limit", msg, ignore.case = TRUE))
-    return("Превышен лимит запросов (HTTP 429). Подождите и повторите.")
-  if (grepl("parse error body|missing value where TRUE/FALSE|content_type", msg,
-            ignore.case = TRUE, perl = TRUE))
-    return(paste0("Ошибка разбора ответа API. Проверьте API-ключ и base URL."))
-  msg
-}
-
-
-.validate_allowed_topics <- function(allowed_topics, unknown_label = "Other") {
-  labels <- unique(trimws(as.character(allowed_topics)))
-  labels <- labels[nzchar(labels)]
-  if (!length(labels)) {
-    cli::cli_abort("{.arg allowed_topics} must contain at least one non-empty label.")
-  }
-  if (!unknown_label %in% labels) {
-    cli::cli_abort("{.arg allowed_topics} must include {.val {unknown_label}}.")
-  }
-  labels
-}
-
-.normalize_topic_label <- function(label, allowed_topics, unknown_label = "Other") {
-  raw <- trimws(as.character(label %||% ""))
-  if (!nzchar(raw)) return(unknown_label)
-
-  lower_allowed <- tolower(allowed_topics)
-
-  # Strip markdown/formatting from a single candidate string
-  .clean <- function(s) {
-    s <- gsub("[*_`#~]", "", s)
-    s <- gsub("\\(.*?\\)", "", s)
-    trimws(gsub("^[[:punct:][:space:]]+|[[:punct:][:space:]]+$", "", s))
-  }
-
-  # Try exact then case-insensitive match on a cleaned token
-  .match_token <- function(s) {
-    s <- .clean(s)
-    if (!nzchar(s)) return(NA_character_)
-    idx <- match(s, allowed_topics)
-    if (!is.na(idx)) return(allowed_topics[[idx]])
-    idx <- match(tolower(s), lower_allowed)
-    if (!is.na(idx)) return(allowed_topics[[idx]])
-    NA_character_
-  }
-
-  # 1. Check every non-empty line
-  lines <- trimws(strsplit(raw, "\n", fixed = TRUE)[[1L]])
-  for (ln in lines[nzchar(lines)]) {
-    hit <- .match_token(ln)
-    if (!is.na(hit)) return(hit)
-  }
-
-  # 2. Word-boundary substring search across the full response
-  for (j in seq_along(allowed_topics)) {
-    pattern <- paste0(
-      "(?i)\\b",
-      gsub("([^[:alnum:]])", "\\\\\\1", allowed_topics[j]),
-      "\\b"
-    )
-    if (grepl(pattern, raw, perl = TRUE)) return(allowed_topics[[j]])
-  }
-
-  unknown_label
-}
-
+# ── Universal LLM ─────────────────────────────────────────────────────────────  #contrib-balance-g-450
+#  #contrib-balance-g-451
+# provider = "openai"    — OpenAI и ЛЮБОЙ OpenAI-совместимый API (DeepSeek,  #contrib-balance-g-452
+#                          Groq, Together, Mistral, LM Studio, vLLM и т.д.)  #contrib-balance-g-453
+#                          Реализован через httr2 напрямую — без ellmer,  #contrib-balance-g-454
+#                          поэтому принимает любое имя модели без капризов.  #contrib-balance-g-455
+# provider = "anthropic" — Anthropic Claude (через ellmer)  #contrib-balance-g-456
+# provider = "gemini"    — Google Gemini   (через ellmer)  #contrib-balance-g-457
+# provider = "ollama"    — Ollama local    (через ellmer)  #contrib-balance-g-458
+  #contrib-balance-g-459
+.classify_ellmer <- function(df, provider, api_key, model, base_url,  #contrib-balance-g-460
+                              allowed_topics = DEFAULT_SECURITY_TOPICS,  #contrib-balance-g-461
+                              unknown_label  = "Other") {  #contrib-balance-g-462
+  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)  #contrib-balance-g-463
+  provider  <- match.arg(provider, c("openai", "anthropic", "gemini", "ollama"))  #contrib-balance-g-464
+  api_key   <- api_key  %||% Sys.getenv("LLM_API_KEY", "")  #contrib-balance-g-465
+  model     <- model    %||% ""  #contrib-balance-g-466
+  base_url  <- base_url %||% ""  #contrib-balance-g-467
+  #contrib-balance-g-468
+  # OpenAI и все OpenAI-совместимые: используем httr2 напрямую  #contrib-balance-g-469
+  if (provider == "openai") {  #contrib-balance-g-470
+    return(.classify_openai_compat(df, api_key, model, base_url,  #contrib-balance-g-471
+                                   allowed_topics, unknown_label))  #contrib-balance-g-472
+  }  #contrib-balance-g-473
+  #contrib-balance-g-474
+  # Остальные провайдеры — через ellmer  #contrib-balance-g-475
+  topics_list <- paste(seq_along(allowed_topics), allowed_topics,  #contrib-balance-g-476
+                       sep = ". ", collapse = "\n")  #contrib-balance-g-477
+  system_prompt <- paste0(  #contrib-balance-g-478
+    "You are a news classifier. ",  #contrib-balance-g-479
+    "Classify the cybersecurity article into EXACTLY ONE topic from this list:\n",  #contrib-balance-g-480
+    topics_list, "\n\n",  #contrib-balance-g-481
+    "Rules:\n",  #contrib-balance-g-482
+    "- Reply with ONLY the exact topic name as it appears in the list above\n",  #contrib-balance-g-483
+    "- No explanations, no numbering, no extra words\n",  #contrib-balance-g-484
+    "- One line only"  #contrib-balance-g-485
+  )  #contrib-balance-g-486
+  #contrib-balance-g-487
+  make_chat <- function() {  #contrib-balance-g-488
+    switch(provider,  #contrib-balance-g-489
+      anthropic = ellmer::chat_anthropic(  #contrib-balance-g-490
+        system_prompt = system_prompt,  #contrib-balance-g-491
+        api_key       = api_key,  #contrib-balance-g-492
+        model         = if (nzchar(model)) model else "claude-3-5-haiku-latest"  #contrib-balance-g-493
+      ),  #contrib-balance-g-494
+      gemini    = ellmer::chat_google_gemini(  #contrib-balance-g-495
+        system_prompt = system_prompt,  #contrib-balance-g-496
+        api_key       = api_key,  #contrib-balance-g-497
+        model         = if (nzchar(model)) model else "gemini-1.5-flash"  #contrib-balance-g-498
+      ),  #contrib-balance-g-499
+      ollama    = ellmer::chat_ollama(  #contrib-balance-g-500
+        system_prompt = system_prompt,  #contrib-balance-g-501
+        model         = if (nzchar(model)) model else "llama3.2",  #contrib-balance-g-502
+        base_url      = if (nzchar(base_url)) base_url else "http://localhost:11434"  #contrib-balance-g-503
+      )  #contrib-balance-g-504
+    )  #contrib-balance-g-505
+  }  #contrib-balance-g-506
+  #contrib-balance-g-507
+  first_err <- NULL  #contrib-balance-g-508
+  n_errors  <- 0L  #contrib-balance-g-509
+  #contrib-balance-g-510
+  labels <- vapply(seq_len(nrow(df)), function(i) {  #contrib-balance-g-511
+    text <- substr(  #contrib-balance-g-512
+      paste(df$title[i] %||% "", df$content_text[i] %||% ""),  #contrib-balance-g-513
+      1L, 1200L  #contrib-balance-g-514
+    )  #contrib-balance-g-515
+    tryCatch({  #contrib-balance-g-516
+      raw <- make_chat()$chat(text)  #contrib-balance-g-517
+      .normalize_topic_label(raw, allowed_topics, unknown_label)  #contrib-balance-g-518
+    }, error = function(e) {  #contrib-balance-g-519
+      n_errors  <<- n_errors + 1L  #contrib-balance-g-520
+      if (is.null(first_err)) first_err <<- .llm_friendly_error(conditionMessage(e))  #contrib-balance-g-521
+      unknown_label  #contrib-balance-g-522
+    })  #contrib-balance-g-523
+  }, character(1L))  #contrib-balance-g-524
+  #contrib-balance-g-525
+  .llm_check_errors(n_errors, nrow(df), first_err)  #contrib-balance-g-526
+  #contrib-balance-g-527
+  df$topic_label <- labels  #contrib-balance-g-528
+  df$topic       <- as.integer(factor(labels, levels = allowed_topics))  #contrib-balance-g-529
+  df  #contrib-balance-g-530
+}  #contrib-balance-g-531
+  #contrib-balance-g-532
+# Прямой вызов через httr2 для OpenAI и любых совместимых API  #contrib-balance-g-533
+.classify_openai_compat <- function(df, api_key, model, base_url,  #contrib-balance-g-534
+                                    allowed_topics, unknown_label) {  #contrib-balance-g-535
+  # Нормализуем base URL по соглашению OpenAI SDK:  #contrib-balance-g-536
+  # конечная точка всегда <base>/v1/chat/completions.  #contrib-balance-g-537
+  # Если пользователь вставил https://api.deepseek.com (как в документации DeepSeek),  #contrib-balance-g-538
+  # автоматически добавляем /v1 — не нужно помнить, что именно вводить.  #contrib-balance-g-539
+  raw_url <- if (nzchar(base_url %||% "")) sub("/+$", "", base_url)  #contrib-balance-g-540
+             else "https://api.openai.com"  #contrib-balance-g-541
+  effective_url   <- if (grepl("/v1$", raw_url)) raw_url else paste0(raw_url, "/v1")  #contrib-balance-g-542
+  effective_model <- if (nzchar(model %||% "")) model else "gpt-4o-mini"  #contrib-balance-g-543
+  endpoint        <- paste0(effective_url, "/chat/completions")  #contrib-balance-g-544
+  #contrib-balance-g-545
+  topics_list <- paste(seq_along(allowed_topics), allowed_topics,  #contrib-balance-g-546
+                       sep = ". ", collapse = "\n")  #contrib-balance-g-547
+  system_msg <- paste0(  #contrib-balance-g-548
+    "You are a news classifier. ",  #contrib-balance-g-549
+    "Classify the cybersecurity article into EXACTLY ONE topic from this list:\n",  #contrib-balance-g-550
+    topics_list, "\n\n",  #contrib-balance-g-551
+    "Rules:\n",  #contrib-balance-g-552
+    "- Reply with ONLY the exact topic name as it appears in the list above\n",  #contrib-balance-g-553
+    "- No explanations, no numbering, no extra words\n",  #contrib-balance-g-554
+    "- One line only"  #contrib-balance-g-555
+  )  #contrib-balance-g-556
+  #contrib-balance-g-557
+  first_err <- NULL  #contrib-balance-g-558
+  n_errors  <- 0L  #contrib-balance-g-559
+  #contrib-balance-g-560
+  labels <- vapply(seq_len(nrow(df)), function(i) {  #contrib-balance-g-561
+    text <- substr(  #contrib-balance-g-562
+      paste(df$title[i] %||% "", df$content_text[i] %||% ""),  #contrib-balance-g-563
+      1L, 1200L  #contrib-balance-g-564
+    )  #contrib-balance-g-565
+    body <- list(  #contrib-balance-g-566
+      model    = effective_model,  #contrib-balance-g-567
+      messages = list(  #contrib-balance-g-568
+        list(role = "system", content = system_msg),  #contrib-balance-g-569
+        list(role = "user",   content = text)  #contrib-balance-g-570
+      ),  #contrib-balance-g-571
+      max_tokens  = 50L,  #contrib-balance-g-572
+      temperature = 0  #contrib-balance-g-573
+    )  #contrib-balance-g-574
+    tryCatch({  #contrib-balance-g-575
+      resp <- httr2::request(endpoint) |>  #contrib-balance-g-576
+        httr2::req_headers(  #contrib-balance-g-577
+          "Authorization" = paste("Bearer", api_key),  #contrib-balance-g-578
+          "Content-Type"  = "application/json"  #contrib-balance-g-579
+        ) |>  #contrib-balance-g-580
+        httr2::req_body_json(body, auto_unbox = TRUE) |>  #contrib-balance-g-581
+        httr2::req_error(is_error = \(r) FALSE) |>  #contrib-balance-g-582
+        httr2::req_perform()  #contrib-balance-g-583
+  #contrib-balance-g-584
+      status <- httr2::resp_status(resp)  #contrib-balance-g-585
+      parsed <- tryCatch(  #contrib-balance-g-586
+        httr2::resp_body_json(resp, simplifyVector = FALSE),  #contrib-balance-g-587
+        error = function(e) NULL  #contrib-balance-g-588
+      )  #contrib-balance-g-589
+  #contrib-balance-g-590
+      if (status != 200L) {  #contrib-balance-g-591
+        err_msg <- parsed$error$message %||%  #contrib-balance-g-592
+                   parsed$message       %||%  #contrib-balance-g-593
+                   paste("HTTP", status)  #contrib-balance-g-594
+        stop(err_msg)  #contrib-balance-g-595
+      }  #contrib-balance-g-596
+  #contrib-balance-g-597
+      raw <- parsed$choices[[1L]]$message$content %||% ""  #contrib-balance-g-598
+      .normalize_topic_label(raw, allowed_topics, unknown_label)  #contrib-balance-g-599
+    }, error = function(e) {  #contrib-balance-g-600
+      n_errors  <<- n_errors + 1L  #contrib-balance-g-601
+      if (is.null(first_err)) {  #contrib-balance-g-602
+        first_err <<- paste0(.llm_friendly_error(conditionMessage(e)),  #contrib-balance-g-603
+                             "\n  endpoint: ", endpoint,  #contrib-balance-g-604
+                             "\n  model: ", effective_model)  #contrib-balance-g-605
+      }  #contrib-balance-g-606
+      unknown_label  #contrib-balance-g-607
+    })  #contrib-balance-g-608
+  }, character(1L))  #contrib-balance-g-609
+  #contrib-balance-g-610
+  .llm_check_errors(n_errors, nrow(df), first_err)  #contrib-balance-g-611
+  #contrib-balance-g-612
+  df$topic_label <- labels  #contrib-balance-g-613
+  df$topic       <- as.integer(factor(labels, levels = allowed_topics))  #contrib-balance-g-614
+  df  #contrib-balance-g-615
+}  #contrib-balance-g-616
+  #contrib-balance-g-617
+.llm_check_errors <- function(n_errors, n_total, first_err) {  #contrib-balance-g-618
+  if (n_errors == 0L) return(invisible(NULL))  #contrib-balance-g-619
+  if (n_errors == n_total) {  #contrib-balance-g-620
+    cli::cli_abort(  #contrib-balance-g-621
+      c("Все {n_total} статей не удалось классифицировать.",  #contrib-balance-g-622
+        "x" = "{first_err}")  #contrib-balance-g-623
+    )  #contrib-balance-g-624
+  }  #contrib-balance-g-625
+  cli::cli_warn(  #contrib-balance-g-626
+    "{n_errors}/{n_total} статей не классифицировано; присвоено fallback-метку."  #contrib-balance-g-627
+  )  #contrib-balance-g-628
+}  #contrib-balance-g-629
+  #contrib-balance-g-630
+.llm_friendly_error <- function(msg) {  #contrib-balance-g-631
+  if (grepl("Insufficient Balance|insufficient_balance", msg, ignore.case = TRUE))  #contrib-balance-g-632
+    return(paste0("Недостаточно средств на балансе. ",  #contrib-balance-g-633
+                  "Пополните счёт на платформе провайдера (например platform.deepseek.com). ",  #contrib-balance-g-634
+                  "API-ключ и настройки верны."))  #contrib-balance-g-635
+  if (grepl("401|Unauthorized|invalid api key|incorrect api", msg, ignore.case = TRUE))  #contrib-balance-g-636
+    return("Неверный API-ключ (HTTP 401). Проверьте поле «API Key».")  #contrib-balance-g-637
+  if (grepl("404|not found|No such model|does not exist", msg, ignore.case = TRUE))  #contrib-balance-g-638
+    return(paste0("Модель или endpoint не найдены (HTTP 404). ",  #contrib-balance-g-639
+                  "Проверьте имя модели. Base URL вводится без /v1 ",  #contrib-balance-g-640
+                  "(например https://api.deepseek.com — /v1 добавляется автоматически)."))  #contrib-balance-g-641
+  if (grepl("429|Too Many Requests|rate.limit", msg, ignore.case = TRUE))  #contrib-balance-g-642
+    return("Превышен лимит запросов (HTTP 429). Подождите и повторите.")  #contrib-balance-g-643
+  if (grepl("parse error body|missing value where TRUE/FALSE|content_type", msg,  #contrib-balance-g-644
+            ignore.case = TRUE, perl = TRUE))  #contrib-balance-g-645
+    return(paste0("Ошибка разбора ответа API. Проверьте API-ключ и base URL."))  #contrib-balance-g-646
+  msg  #contrib-balance-g-647
+}  #contrib-balance-g-648
+  #contrib-balance-g-649
+  #contrib-balance-g-650
+.validate_allowed_topics <- function(allowed_topics, unknown_label = "Other") {  #contrib-balance-g-651
+  labels <- unique(trimws(as.character(allowed_topics)))  #contrib-balance-g-652
+  labels <- labels[nzchar(labels)]  #contrib-balance-g-653
+  if (!length(labels)) {  #contrib-balance-g-654
+    cli::cli_abort("{.arg allowed_topics} must contain at least one non-empty label.")  #contrib-balance-g-655
+  }  #contrib-balance-g-656
+  if (!unknown_label %in% labels) {  #contrib-balance-g-657
+    cli::cli_abort("{.arg allowed_topics} must include {.val {unknown_label}}.")  #contrib-balance-g-658
+  }  #contrib-balance-g-659
+  labels  #contrib-balance-g-660
+}  #contrib-balance-g-661
+  #contrib-balance-g-662
+.normalize_topic_label <- function(label, allowed_topics, unknown_label = "Other") {  #contrib-balance-g-663
+  raw <- trimws(as.character(label %||% ""))  #contrib-balance-g-664
+  if (!nzchar(raw)) return(unknown_label)  #contrib-balance-g-665
+  #contrib-balance-g-666
+  lower_allowed <- tolower(allowed_topics)  #contrib-balance-g-667
+  #contrib-balance-g-668
+  # Strip markdown/formatting from a single candidate string  #contrib-balance-g-669
+  .clean <- function(s) {  #contrib-balance-g-670
+    s <- gsub("[*_`#~]", "", s)  #contrib-balance-g-671
+    s <- gsub("\\(.*?\\)", "", s)  #contrib-balance-g-672
+    trimws(gsub("^[[:punct:][:space:]]+|[[:punct:][:space:]]+$", "", s))  #contrib-balance-g-673
+  }  #contrib-balance-g-674
+  #contrib-balance-g-675
+  # Try exact then case-insensitive match on a cleaned token  #contrib-balance-g-676
+  .match_token <- function(s) {  #contrib-balance-g-677
+    s <- .clean(s)  #contrib-balance-g-678
+    if (!nzchar(s)) return(NA_character_)  #contrib-balance-g-679
+    idx <- match(s, allowed_topics)  #contrib-balance-g-680
+    if (!is.na(idx)) return(allowed_topics[[idx]])  #contrib-balance-g-681
+    idx <- match(tolower(s), lower_allowed)  #contrib-balance-g-682
+    if (!is.na(idx)) return(allowed_topics[[idx]])  #contrib-balance-g-683
+    NA_character_  #contrib-balance-g-684
+  }  #contrib-balance-g-685
+  #contrib-balance-g-686
+  # 1. Check every non-empty line  #contrib-balance-g-687
+  lines <- trimws(strsplit(raw, "\n", fixed = TRUE)[[1L]])  #contrib-balance-g-688
+  for (ln in lines[nzchar(lines)]) {  #contrib-balance-g-689
+    hit <- .match_token(ln)  #contrib-balance-g-690
+    if (!is.na(hit)) return(hit)  #contrib-balance-g-691
+  }  #contrib-balance-g-692
+  #contrib-balance-g-693
+  # 2. Word-boundary substring search across the full response  #contrib-balance-g-694
+  for (j in seq_along(allowed_topics)) {  #contrib-balance-g-695
+    pattern <- paste0(  #contrib-balance-g-696
+      "(?i)\\b",  #contrib-balance-g-697
+      gsub("([^[:alnum:]])", "\\\\\\1", allowed_topics[j]),  #contrib-balance-g-698
+      "\\b"  #contrib-balance-g-699
+    )  #contrib-balance-g-700
+    if (grepl(pattern, raw, perl = TRUE)) return(allowed_topics[[j]])  #contrib-balance-g-701
+  }  #contrib-balance-g-702
+  #contrib-balance-g-703
+  unknown_label  #contrib-balance-g-704
+}  #contrib-balance-g-705
+  #contrib-balance-g-706
 .yandex_cache_key <- function(model_uri, text) {
   txt <- text %||% ""
   head_part <- substring(txt, 1L, min(200L, nchar(txt)))
