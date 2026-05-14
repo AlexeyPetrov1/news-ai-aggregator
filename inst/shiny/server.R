@@ -28,6 +28,22 @@ server <- function(input, output, session) {
     log = character(0)
   )
 
+  # Сокращает LDA-метки "Тема N: слово1, слово2, ..." → "#N слово1 · слово2"
+  # Остальные метки обрезает до 28 символов с "…" если длиннее
+  shorten_lda_label <- function(lbl) {
+    is_lda <- grepl("^Тема \\d+: ", lbl, perl = TRUE)
+    out    <- lbl
+    if (any(is_lda)) {
+      nums  <- regmatches(lbl[is_lda], regexpr("\\d+", lbl[is_lda]))
+      tstr  <- sub("^Тема \\d+: ", "", lbl[is_lda])
+      terms <- lapply(strsplit(tstr, ",\\s*"), function(x) head(trimws(x), 2))
+      out[is_lda] <- paste0("#", nums, " ", vapply(terms, paste, "", collapse = " · "))
+    }
+    long <- !is_lda & nchar(out) > 28
+    out[long] <- paste0(substr(out[long], 1, 25), "…")
+    out
+  }
+
   .log <- function(...) {
     msg    <- paste0("[", format(Sys.time(), "%H:%M:%S"), "] ", ...)
     rv$log <- c(rv$log, msg)
@@ -71,53 +87,58 @@ server <- function(input, output, session) {
     req(rv$df)
     .log("Классификация (", input$cfg_method, ")…")
     withProgress(message = "Классификация…", {
-      tryCatch({
-        yandex_api_key  <- trimws(if (is.null(input$cfg_yandex_api_key)) "" else input$cfg_yandex_api_key)
-        yandex_folder   <- trimws(if (is.null(input$cfg_yandex_folder)) "" else input$cfg_yandex_folder)
-        yandex_model    <- trimws(if (is.null(input$cfg_yandex_model)) "" else input$cfg_yandex_model)
-        yandex_base_url <- trimws(if (is.null(input$cfg_yandex_base_url)) "" else input$cfg_yandex_base_url)
-        llm_api_key     <- trimws(if (is.null(input$cfg_llm_api_key)) "" else input$cfg_llm_api_key)
-        llm_model       <- trimws(if (is.null(input$cfg_llm_model)) "" else input$cfg_llm_model)
-        llm_base_url    <- trimws(if (is.null(input$cfg_llm_base_url)) "" else input$cfg_llm_base_url)
-        llm_provider    <- if (is.null(input$cfg_llm_provider)) "openai" else input$cfg_llm_provider
+      withCallingHandlers(
+        tryCatch({
+          yandex_api_key  <- trimws(if (is.null(input$cfg_yandex_api_key)) "" else input$cfg_yandex_api_key)
+          yandex_folder   <- trimws(if (is.null(input$cfg_yandex_folder)) "" else input$cfg_yandex_folder)
+          yandex_model    <- trimws(if (is.null(input$cfg_yandex_model)) "" else input$cfg_yandex_model)
+          yandex_base_url <- trimws(if (is.null(input$cfg_yandex_base_url)) "" else input$cfg_yandex_base_url)
+          llm_api_key     <- trimws(if (is.null(input$cfg_llm_api_key)) "" else input$cfg_llm_api_key)
+          llm_model       <- trimws(if (is.null(input$cfg_llm_model)) "" else input$cfg_llm_model)
+          llm_base_url    <- trimws(if (is.null(input$cfg_llm_base_url)) "" else input$cfg_llm_base_url)
+          llm_provider    <- if (is.null(input$cfg_llm_provider)) "openai" else input$cfg_llm_provider
 
-        if (identical(input$cfg_method, "yandex_llm")) {
-          if (!nzchar(yandex_api_key)) {
-            .log("Ошибка: не задан Yandex API key.")
-            return(invisible(NULL))
+          if (identical(input$cfg_method, "yandex_llm")) {
+            if (!nzchar(yandex_api_key)) {
+              .log("Ошибка: не задан Yandex API key.")
+              return(invisible(NULL))
+            }
+            if (!nzchar(yandex_folder)) {
+              .log("Ошибка: не задан Yandex folder id.")
+              return(invisible(NULL))
+            }
           }
-          if (!nzchar(yandex_folder)) {
-            .log("Ошибка: не задан Yandex folder id.")
-            return(invisible(NULL))
+
+          if (identical(input$cfg_method, "llm")) {
+            needs_key <- llm_provider %in% c("openai", "anthropic", "gemini")
+            if (needs_key && !nzchar(llm_api_key) &&
+                !nzchar(Sys.getenv("LLM_API_KEY", ""))) {
+              .log("Ошибка: не задан API Key (поле «API Key» или переменная LLM_API_KEY).")
+              return(invisible(NULL))
+            }
           }
+
+          rv$df <- classify_news(
+            rv$df,
+            n_topics         = input$cfg_n_topics,
+            method           = input$cfg_method,
+            yandex_api_key   = if (nzchar(yandex_api_key)) yandex_api_key else NULL,
+            yandex_folder_id = if (nzchar(yandex_folder)) yandex_folder else NULL,
+            yandex_model     = if (nzchar(yandex_model)) yandex_model
+                               else Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
+            yandex_base_url  = if (nzchar(yandex_base_url)) yandex_base_url
+                               else Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
+            llm_provider     = llm_provider,
+            llm_api_key      = if (nzchar(llm_api_key)) llm_api_key else NULL,
+            llm_model        = if (nzchar(llm_model)) llm_model else NULL,
+            llm_base_url     = if (nzchar(llm_base_url)) llm_base_url else NULL
+          )
+          .log("Готово. Тем: ", length(unique(rv$df$topic_label)))
+        }, error = function(e) .log("Ошибка: ", conditionMessage(e))),
+        llm_partial_error = function(c) {
+          .log("! ", conditionMessage(c))
         }
-
-        if (identical(input$cfg_method, "llm")) {
-          needs_key <- llm_provider %in% c("openai", "anthropic", "gemini")
-          if (needs_key && !nzchar(llm_api_key) &&
-              !nzchar(Sys.getenv("LLM_API_KEY", ""))) {
-            .log("Ошибка: не задан API Key (поле «API Key» или переменная LLM_API_KEY).")
-            return(invisible(NULL))
-          }
-        }
-
-        rv$df <- classify_news(
-          rv$df,
-          n_topics         = input$cfg_n_topics,
-          method           = input$cfg_method,
-          yandex_api_key   = if (nzchar(yandex_api_key)) yandex_api_key else NULL,
-          yandex_folder_id = if (nzchar(yandex_folder)) yandex_folder else NULL,
-          yandex_model     = if (nzchar(yandex_model)) yandex_model
-                             else Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
-          yandex_base_url  = if (nzchar(yandex_base_url)) yandex_base_url
-                             else Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
-          llm_provider     = llm_provider,
-          llm_api_key      = if (nzchar(llm_api_key)) llm_api_key else NULL,
-          llm_model        = if (nzchar(llm_model)) llm_model else NULL,
-          llm_base_url     = if (nzchar(llm_base_url)) llm_base_url else NULL
-        )
-        .log("Готово. Тем: ", length(unique(rv$df$topic_label)))
-      }, error = function(e) .log("Ошибка: ", conditionMessage(e)))
+      )
     })
   })
 
@@ -212,31 +233,42 @@ server <- function(input, output, session) {
     top_topics <- df |>
       filter(!is.na(topic_label), nzchar(topic_label)) |>
       count(topic_label, sort = TRUE) |>
-      slice_head(n = 6) |>
+      slice_head(n = 5) |>
       pull(topic_label)
 
     trend <- df |>
-      mutate(day = as.Date(as.character(published_at))) |>
+      mutate(
+        day  = as.Date(as.character(published_at)),
+        week = as.Date(cut(day, breaks = "week"))
+      ) |>
       filter(!is.na(day), !is.na(topic_label), nzchar(topic_label)) |>
-      mutate(topic_group = if_else(topic_label %in% top_topics, topic_label, "Other topics")) |>
-      count(day, topic_group) |>
-      arrange(day)
+      mutate(
+        grp   = if_else(topic_label %in% top_topics, topic_label, "Прочие темы"),
+        label = shorten_lda_label(grp)
+      ) |>
+      count(week, label) |>
+      arrange(week)
 
     req(nrow(trend) > 0)
     plot_ly(
       trend,
-      x = ~day,
-      y = ~n,
-      color = ~topic_group,
-      colors = "Set2",
-      type = "scatter",
-      mode = "lines+markers"
+      x          = ~week,
+      y          = ~n,
+      color      = ~label,
+      colors     = "Set2",
+      type       = "scatter",
+      mode       = "lines",
+      stackgroup = "one",
+      hovertemplate = "<b>%{fullData.name}</b><br>%{x|%d %b %Y}: %{y} ст.<extra></extra>"
     ) |>
       layout(
-        xaxis = list(title = ""),
-        yaxis = list(title = "Статей в день"),
-        legend = list(orientation = "h", y = -0.2),
-        margin = list(l = 60, r = 20, t = 10, b = 70)
+        xaxis  = list(title = ""),
+        yaxis  = list(title = "Статей за неделю"),
+        legend = list(
+          orientation = "v", x = 1.02, y = 0.5,
+          xanchor = "left", font = list(size = 11)
+        ),
+        margin = list(l = 50, r = 160, t = 10, b = 40)
       )
   })
 
@@ -246,20 +278,25 @@ server <- function(input, output, session) {
 
     rare <- df |>
       filter(!is.na(topic_label), nzchar(topic_label)) |>
-      count(topic_label, sort = TRUE) |>
+      count(topic_label, sort = FALSE) |>
       arrange(n) |>
-      slice_head(n = 8)
+      slice_head(n = 8) |>
+      mutate(label = shorten_lda_label(topic_label))
 
     req(nrow(rare) > 0)
-    plot_ly(rare,
-            x = ~reorder(topic_label, n),
-            y = ~n,
-            type = "bar",
-            marker = list(color = "#00c0ef")) |>
+    plot_ly(
+      rare,
+      x           = ~n,
+      y           = ~reorder(label, n),
+      type        = "bar",
+      orientation = "h",
+      marker      = list(color = "#00c0ef"),
+      hovertemplate = "<b>%{y}</b><br>%{x} статей<extra></extra>"
+    ) |>
       layout(
-        xaxis = list(title = "", tickangle = -30),
-        yaxis = list(title = "Статей"),
-        margin = list(l = 50, r = 20, t = 10, b = 90)
+        xaxis  = list(title = "Количество статей"),
+        yaxis  = list(title = ""),
+        margin = list(l = 160, r = 20, t = 10, b = 50)
       )
   })
 

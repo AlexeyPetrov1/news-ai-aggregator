@@ -312,27 +312,32 @@ cd news-ai-aggregator
 
 ### 9.3. Подготовка `.env`
 
+Скопируйте шаблон:
+
+**Linux / macOS:**
+
 ```bash
 cp .env.example .env
 ```
 
-Проверьте значения:
+**Windows (PowerShell):**
 
-```bash
-cat .env
+```powershell
+Copy-Item .env.example .env
 ```
 
-Минимально проверьте:
+Минимально проверьте и при необходимости измените:
 
-- `TTRSS_ADMIN_USER`;
-- `TTRSS_ADMIN_PASSWORD`;
-- `CH_DB`;
-- `CH_USER`;
-- `CH_PASSWORD`;
-- `MAX_ARTICLES`;
-- `SCHEDULER_INTERVAL_SECONDS`;
-- `CLASSIFY_METHOD`;
-- `N_TOPICS`.
+- `TTRSS_ADMIN_USER` / `TTRSS_ADMIN_PASSWORD` — учётные данные TT-RSS;
+- `CH_DB`, `CH_USER`, `CH_PASSWORD` — параметры ClickHouse;
+- `MAX_ARTICLES` — лимит статей за цикл;
+- `SCHEDULER_INTERVAL_SECONDS` — частота опроса (секунды);
+- `CLASSIFY_METHOD` — метод классификации (`lda`, `kmeans`, `yandex_llm`);
+- `N_TOPICS` — количество тем (для LDA / K-Means).
+
+> Файл `.env` содержит секреты — не коммитьте его в репозиторий.
+
+Полная пошаговая инструкция по каждой переменной — в **[разделе 9.4](#94-подробная-инструкция-по-созданию-env)**.
 
 ---
 
@@ -539,38 +544,17 @@ RUN_ADD_FEEDS_EACH_CYCLE=false
 
 ---
 
-## 10. Clean start: рекомендуемый запуск
+## 10. Запуск Docker-образа
 
-Из корня репозитория одной командой:
+Убедитесь, что **Docker Desktop** установлен и запущен, `.env` заполнен (см. [раздел 9.3–9.4](#93-подготовка-env)), затем из корня репозитория:
 
 ```bash
 docker compose up -d --build
 ```
 
-Эта команда запускает сразу все сервисы: TT-RSS, PostgreSQL, ClickHouse, scheduler, Shiny и MCP.
+Эта одна команда собирает образы и запускает весь стек: TT-RSS, PostgreSQL, ClickHouse, scheduler, Shiny и MCP.
 
-### ОБЯЗАТЕЛЬНО:
----
-
-### Первый запуск TT-RSS
-
-Откройте:
-
-```text
-http://localhost:8080
-```
-
-Войдите под админским пользователем.
-
-Если используются дефолтные значения:
-
-```text
-admin / password
-```
-
-**API-доступ включается автоматически** сервисом `ttrss-init` при первом запуске. Ручное включение через UI больше не требуется.
-
-### Проверка контейнеров:
+### Проверка контейнеров
 
 ```bash
 docker compose ps
@@ -581,11 +565,33 @@ docker compose ps
 ```text
 ttrss-db          Up (healthy)
 ttrss             Up (healthy)
-ttrss-init        Exited (0)   ← API включён
+ttrss-init        Exited (0)   ← API включён автоматически
 clickhouse        Up (healthy)
 ttrss-shiny       Up
 ttrss-mcp         Up
 ttrss-scheduler   Up
+```
+
+### Первый запуск TT-RSS
+
+Откройте `http://localhost:8080` и войдите под admin-пользователем.
+
+Если в `.env` не меняли учётные данные:
+
+```text
+admin / password
+```
+
+**API-доступ включается автоматически** сервисом `ttrss-init`. Ручное включение через UI не требуется.
+
+### Остановка и пересборка
+
+```bash
+# остановить без удаления данных
+docker compose down
+
+# пересобрать после изменений кода
+docker compose up -d --build
 ```
 
 
