@@ -187,14 +187,9 @@ server <- function(input, output, session) {
     df <- rv$df
     req(df, "topic_label" %in% names(df))
     topic_stats <- df |>
-      filter(!is.na(topic_label), nzchar(topic_label)) |>
+      filter(!is.na(topic_label), nzchar(topic_label), topic_label != "Other") |>
       count(topic_label, sort = TRUE) |>
-      mutate(
-        share = round(100 * n / sum(n), 1),
-        topic_label = if_else(topic_label == "Other",
-                              paste0(topic_label, " (fallback)"),
-                              topic_label)
-      )
+      mutate(share = round(100 * n / sum(n), 1))
     req(nrow(topic_stats) > 0)
     plot_ly(topic_stats,
             x = ~n,
@@ -231,7 +226,7 @@ server <- function(input, output, session) {
     req(df, "published_at" %in% names(df), "topic_label" %in% names(df))
 
     top_topics <- df |>
-      filter(!is.na(topic_label), nzchar(topic_label)) |>
+      filter(!is.na(topic_label), nzchar(topic_label), topic_label != "Other") |>
       count(topic_label, sort = TRUE) |>
       slice_head(n = 5) |>
       pull(topic_label)
@@ -241,7 +236,7 @@ server <- function(input, output, session) {
         day  = as.Date(as.character(published_at)),
         week = as.Date(cut(day, breaks = "week"))
       ) |>
-      filter(!is.na(day), !is.na(topic_label), nzchar(topic_label)) |>
+      filter(!is.na(day), !is.na(topic_label), nzchar(topic_label), topic_label != "Other") |>
       mutate(
         grp   = if_else(topic_label %in% top_topics, topic_label, "Прочие темы"),
         label = shorten_lda_label(grp)
@@ -277,7 +272,7 @@ server <- function(input, output, session) {
     req(df, "topic_label" %in% names(df))
 
     rare <- df |>
-      filter(!is.na(topic_label), nzchar(topic_label)) |>
+      filter(!is.na(topic_label), nzchar(topic_label), topic_label != "Other") |>
       count(topic_label, sort = FALSE) |>
       arrange(n) |>
       slice_head(n = 8) |>

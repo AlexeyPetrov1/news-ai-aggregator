@@ -275,6 +275,8 @@ classify_news <- function(df,  #contrib-balance-g-284
         "You are a cybersecurity news classifier. ",
         "Classify the article into EXACTLY ONE label from this list: ",
         allowed_topics_text, ". ",
+        "If the article does not perfectly match one label, pick the CLOSEST one. ",
+        "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",
         "Return ONLY the label text — one line, no explanations, no extra words. ",
         "Respond in English."
       ),
@@ -427,6 +429,8 @@ classify_news <- function(df,  #contrib-balance-g-284
     "Output the label text only — no explanation, no punctuation, no extra words, one line.\n\n",
     "Labels:\n",  #contrib-balance-g-480
     topics_list, "\n\n",  #contrib-balance-g-481
+    "If the article does not perfectly match one label, pick the CLOSEST one. ",
+    "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",
     "Respond in English. One line. Exact label text only."
   )  #contrib-balance-g-486
   #contrib-balance-g-487
@@ -506,6 +510,8 @@ classify_news <- function(df,  #contrib-balance-g-284
     "Output the label text only — no explanation, no punctuation, no extra words, one line.\n\n",
     "Labels:\n",  #contrib-balance-g-550
     topics_list, "\n\n",  #contrib-balance-g-551
+    "If the article does not perfectly match one label, pick the CLOSEST one. ",
+    "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",
     "Respond in English. One line. Exact label text only."
   )  #contrib-balance-g-556
   #contrib-balance-g-557
