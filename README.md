@@ -1,123 +1,123 @@
-# news-ai-aggregator
+# news-ai-aggregator 
 
-`news-ai-aggregator` — R-based ETL/ML/NLP-пайплайн для сбора, тематической классификации и аналитики новостей по кибербезопасности.
+`news-ai-aggregator` — R-based ETL/ML/NLP-пайплайн для сбора, тематической классификации и аналитики новостей по кибербезопасности. 
 
-Основной поток данных:
+Основной поток данных: 
 
-```text
-TT-RSS -> нормализация -> topic classification -> ClickHouse -> Shiny + MCP
-```
+```text 
+TT-RSS -> нормализация -> topic classification -> ClickHouse -> Shiny + MCP 
+``` 
+ 
+Проект собирает статьи из TT-RSS, нормализует их, присваивает каждой новости тему, сохраняет результат в ClickHouse, показывает аналитику в Shiny и отдает готовые выборки через MCP-инструменты. 
+ 
+--- 
+ 
+## 1. Что делает проект 
+ 
+Проект предназначен для аналитики новостей по кибербезопасности: 
+ 
+- собирает RSS-новости через TT-RSS JSON API; 
+- нормализует статьи в R-пайплайне; 
+- классифицирует новости по фиксированной таксономии security-тем; 
+- сохраняет статьи, фиды и агрегаты в ClickHouse; 
+- показывает интерактивный Shiny-дашборд; 
+- предоставляет MCP JSON-RPC endpoint для AI-агентов; 
+- поддерживает периодический ingestion через `scheduler`. 
+ 
+Тематика данных: 
+ 
+- threat intelligence; 
+- инциденты информационной безопасности; 
+- уязвимости; 
+- malware; 
+- phishing; 
+- общие cybersecurity-новости. 
+ 
+--- 
+ 
+## 2. Актуальная архитектура 
+ 
+```text 
+                  +----------------+ 
+                  | RSS источники   | 
+                  +--------+-------+ 
+                           | 
+                           v 
+                  +----------------+ 
+                  |    TT-RSS      | 
+                  | UI + JSON API  | 
+                  +--------+-------+ 
+                           | 
+                           v 
+                  +----------------+ 
+                  | scheduler      | 
+                  | fetch_news.R   | 
+                  +--------+-------+ 
+                           | 
+                           v 
+                  +----------------+ 
+                  | R ETL / ML     | 
+                  | normalize      | 
+                  | classify       | 
+                  +--------+-------+ 
+                           | 
+                           v 
+                  +----------------+ 
+                  |  ClickHouse    | 
+                  | articles       | 
+                  | feeds          | 
+                  | topic_summary  | 
+                  +----+-------+---+ 
+                       |       | 
+              +--------+       +---------+ 
+              v                          v 
+       +--------------+           +--------------+ 
+       | Shiny UI     |           | MCP endpoint | 
+       | dashboard    |           | JSON-RPC     | 
+       +--------------+           +--------------+ 
+``` 
 
-Проект собирает статьи из TT-RSS, нормализует их, присваивает каждой новости тему, сохраняет результат в ClickHouse, показывает аналитику в Shiny и отдает готовые выборки через MCP-инструменты.
+Ключевой принцип текущей версии: **основной ingestion-контур — `scheduler`, а не ручной запуск `source("data-raw/fetch_news.R")`**. 
 
----
+`scheduler` циклически: 
 
-## 1. Что делает проект
+1. запускает `Rscript data-raw/fetch_news.R`; 
+2. инициализирует схему ClickHouse через `ch_init_schema`; 
+3. записывает или обновляет данные через `ch_write_articles`; 
+4. ждет `SCHEDULER_INTERVAL_SECONDS`; 
+5. повторяет цикл. 
 
-Проект предназначен для аналитики новостей по кибербезопасности:
+Такой режим нужен, чтобы проект автоматически восстанавливался после сброса volume ClickHouse. 
 
-- собирает RSS-новости через TT-RSS JSON API;
-- нормализует статьи в R-пайплайне;
-- классифицирует новости по фиксированной таксономии security-тем;
-- сохраняет статьи, фиды и агрегаты в ClickHouse;
-- показывает интерактивный Shiny-дашборд;
-- предоставляет MCP JSON-RPC endpoint для AI-агентов;
-- поддерживает периодический ingestion через `scheduler`.
-
-Тематика данных:
-
-- threat intelligence;
-- инциденты информационной безопасности;
-- уязвимости;
-- malware;
-- phishing;
-- общие cybersecurity-новости.
-
----
-
-## 2. Актуальная архитектура
-
-```text
-                  +----------------+
-                  | RSS источники   |
-                  +--------+-------+
-                           |
-                           v
-                  +----------------+
-                  |    TT-RSS      |
-                  | UI + JSON API  |
-                  +--------+-------+
-                           |
-                           v
-                  +----------------+
-                  | scheduler      |
-                  | fetch_news.R   |
-                  +--------+-------+
-                           |
-                           v
-                  +----------------+
-                  | R ETL / ML     |
-                  | normalize      |
-                  | classify       |
-                  +--------+-------+
-                           |
-                           v
-                  +----------------+
-                  |  ClickHouse    |
-                  | articles       |
-                  | feeds          |
-                  | topic_summary  |
-                  +----+-------+---+
-                       |       |
-              +--------+       +---------+
-              v                          v
-       +--------------+           +--------------+
-       | Shiny UI     |           | MCP endpoint |
-       | dashboard    |           | JSON-RPC     |
-       +--------------+           +--------------+
-```
-
-Ключевой принцип текущей версии: **основной ingestion-контур — `scheduler`, а не ручной запуск `source("data-raw/fetch_news.R")`**.
-
-`scheduler` циклически:
-
-1. запускает `Rscript data-raw/fetch_news.R`;
-2. инициализирует схему ClickHouse через `ch_init_schema`;
-3. записывает или обновляет данные через `ch_write_articles`;
-4. ждет `SCHEDULER_INTERVAL_SECONDS`;
-5. повторяет цикл.
-
-Такой режим нужен, чтобы проект автоматически восстанавливался после сброса volume ClickHouse.
-
----
-
-## 3. Docker-сервисы
-
+--- 
+ 
+## 3. Docker-сервисы 
+ 
 Все сервисы запускаются из единого `docker-compose.yml` в корне репозитория.
-
-| Сервис | Назначение |
+ 
+| Сервис | Назначение | 
 |---|---|
 | `ttrss-db` | PostgreSQL для TT-RSS |
 | `ttrss` | TT-RSS web UI и API |
 | `ttrss-init` | one-shot: включает API-доступ для admin |
-| `clickhouse` | аналитическое хранилище |
-| `scheduler` | периодический запуск `fetch_news.R`; основной ingestion path |
+| `clickhouse` | аналитическое хранилище | 
+| `scheduler` | периодический запуск `fetch_news.R`; основной ingestion path | 
 | `shiny` | UI-дашборд (вкладки: Обзор, Новости, Источники, Настройки) |
-| `mcp` | JSON-RPC endpoint с MCP-инструментами |
+| `mcp` | JSON-RPC endpoint с MCP-инструментами | 
 
----
-
-## 4. Service URLs
-
-| Компонент | URL |
-|---|---|
-| TT-RSS UI | `http://localhost:8080` |
-| TT-RSS API | `http://localhost:8080/api/` |
-| Shiny dashboard | `http://localhost:3838/ttrss` |
-| MCP endpoint | `http://localhost:8000/mcp` |
-| MCP healthcheck | `http://localhost:8000/health` |
-| ClickHouse HTTP | `http://localhost:8123` |
-
+--- 
+ 
+## 4. Service URLs 
+ 
+| Компонент | URL | 
+|---|---| 
+| TT-RSS UI | `http://localhost:8080` | 
+| TT-RSS API | `http://localhost:8080/api/` | 
+| Shiny dashboard | `http://localhost:3838/ttrss` | 
+| MCP endpoint | `http://localhost:8000/mcp` | 
+| MCP healthcheck | `http://localhost:8000/health` | 
+| ClickHouse HTTP | `http://localhost:8123` | 
+ 
 ### TT-RSS: порты и URL
 
 | Где обращаемся | URL | Пояснение |
@@ -128,31 +128,31 @@ TT-RSS -> нормализация -> topic classification -> ClickHouse -> Shin
 
 Переменная `TTRSS_PORT` в `.env` меняет только внешний порт на хосте (по умолчанию `8080`). Внутри Docker-сети TT-RSS всегда доступен по порту **80**.
 
-Логин и пароль TT-RSS по умолчанию, если они не изменены в `.env` или compose-файлах:
-
-```text
-admin / password
-```
-
----
-
+Логин и пароль TT-RSS по умолчанию, если они не изменены в `.env` или compose-файлах: 
+ 
+```text 
+admin / password 
+``` 
+ 
+--- 
+ 
 ## 5. Технологии
-
-| Слой | Технологии |
-|---|---|
-| Core | R, package-based структура |
-| RSS ingestion | TT-RSS JSON API |
-| ETL | R scripts в `R/` и `data-raw/` |
+ 
+| Слой | Технологии | 
+|---|---| 
+| Core | R, package-based структура | 
+| RSS ingestion | TT-RSS JSON API | 
+| ETL | R scripts в `R/` и `data-raw/` | 
 | ML / NLP | `lda`, `kmeans`, `yandex_llm`, `llm` |
 | LLM-классификация | Yandex GPT; универсальный `llm` (OpenAI-совместимые, Anthropic, Gemini, Ollama через `ellmer`) |
-| Storage | ClickHouse |
-| Dashboard | Shiny, shinydashboard, plotly, DT |
-| Agent API | MCP over JSON-RPC 2.0 |
-| Runtime | Docker Compose |
-
----
-
-## 6. Структура репозитория
+| Storage | ClickHouse | 
+| Dashboard | Shiny, shinydashboard, plotly, DT | 
+| Agent API | MCP over JSON-RPC 2.0 | 
+| Runtime | Docker Compose | 
+ 
+--- 
+ 
+## 6. Структура репозитория 
 
 ```text
 news-ai-aggregator/
@@ -160,161 +160,161 @@ news-ai-aggregator/
 │   ├── api.R                         # клиент TT-RSS API
 │   ├── labels.R                      # управление метками TT-RSS (R API, не вкладка Shiny)
 │   ├── etl.R                         # сбор и нормализация данных
-│   ├── classify.R                    # lda / kmeans / yandex_llm + quality logic
-│   ├── ground_truth.R                # optional validation utilities
-│   ├── db.R                          # ClickHouse layer
+│   ├── classify.R                    # lda / kmeans / yandex_llm + quality logic 
+│   ├── ground_truth.R                # optional validation utilities 
+│   ├── db.R                          # ClickHouse layer 
 │   └── app.R                         # run_dashboard() / run_mcp_server()
-│
+│ 
 ├── data-raw/
-│   ├── add_security_feeds.R          # добавление security RSS-фидов
-│   ├── replace_feeds_ru.R            # замена / настройка русскоязычных фидов
-│   ├── fetch_news.R                  # основной ingestion script
-│   ├── compare_methods.R             # сравнение методов классификации
-│   ├── mini_ground_truth_workflow.R  # optional validation workflow
+│   ├── add_security_feeds.R          # добавление security RSS-фидов 
+│   ├── replace_feeds_ru.R            # замена / настройка русскоязычных фидов 
+│   ├── fetch_news.R                  # основной ingestion script 
+│   ├── compare_methods.R             # сравнение методов классификации 
+│   ├── mini_ground_truth_workflow.R  # optional validation workflow 
 │   └── canonical_topic_mapping_template.csv
-│
-├── inst/
-│   ├── shiny/                        # Shiny dashboard
-│   └── mcp/                          # MCP server: stdio + HTTP
-│
+│ 
+├── inst/ 
+│   ├── shiny/                        # Shiny dashboard 
+│   └── mcp/                          # MCP server: stdio + HTTP 
+│ 
 ├── tests/testthat/
 │   ├── test-api.R
 │   ├── test-etl.R
 │   ├── test-classify.R
 │   └── test-ground-truth.R
-│
+│ 
 ├── docker/
 │   └── shiny-server.conf              # конфигурация Shiny Server
-│
+│ 
 ├── docker-compose.yml                  # весь стек: TT-RSS + PostgreSQL + ClickHouse + Shiny + MCP + scheduler
 ├── .env.example                        # шаблон переменных окружения
 └── README.md
 ```
 
----
+--- 
 
-## 7. Переменные окружения
+## 7. Переменные окружения 
 
-Используйте `.env.example` как шаблон.
+Используйте `.env.example` как шаблон. 
 
-Минимальный набор для стабильной работы `scheduler`:
-
-```env
-TTRSS_ADMIN_USER=admin
-TTRSS_ADMIN_PASSWORD=password
-
-CH_DB=ttrss
-CH_USER=default
-CH_PASSWORD=
-
-MAX_ARTICLES=500
-SCHEDULER_INTERVAL_SECONDS=3600
-
-CLASSIFY_METHOD=lda
-N_TOPICS=8
-```
-
-В Docker Compose `scheduler` должен обращаться к ClickHouse по имени сервиса:
-
-```env
-CH_HOST=clickhouse
-CH_PORT=9000
-```
-
-Для локального ручного запуска с хост-машины обычно используется:
-
-```env
-CH_HOST=localhost
-CH_PORT=9000
-```
+Минимальный набор для стабильной работы `scheduler`: 
+ 
+```env 
+TTRSS_ADMIN_USER=admin 
+TTRSS_ADMIN_PASSWORD=password 
+ 
+CH_DB=ttrss 
+CH_USER=default 
+CH_PASSWORD= 
+ 
+MAX_ARTICLES=500 
+SCHEDULER_INTERVAL_SECONDS=3600 
+ 
+CLASSIFY_METHOD=lda 
+N_TOPICS=8 
+``` 
+ 
+В Docker Compose `scheduler` должен обращаться к ClickHouse по имени сервиса: 
+ 
+```env 
+CH_HOST=clickhouse 
+CH_PORT=9000 
+``` 
+ 
+Для локального ручного запуска с хост-машины обычно используется: 
+ 
+```env 
+CH_HOST=localhost 
+CH_PORT=9000 
+``` 
 
 Для TT-RSS в Docker Compose в `docker-compose.yml` уже задано `TTRSS_URL=http://ttrss/` (порт **80** внутри сети). Менять на `http://ttrss:8080` не нужно — с хоста TT-RSS открывается как `http://localhost:8080`, это другой контекст.
 
 Для ручного запуска R на хосте используйте `TTRSS_URL=http://localhost:8080`, `TTRSS_USER`, `TTRSS_PASSWORD`. Учётные данные совпадают с `TTRSS_ADMIN_USER` / `TTRSS_ADMIN_PASSWORD`, если вы их не меняли.
-
----
-
-## 8. Yandex LLM: настройка классификатора
-
-`yandex_llm` используется как closed-set классификатор: модель должна выбрать ровно одну тему из фиксированного списка `DEFAULT_SECURITY_TOPICS`. Если ответ модели не совпадает с разрешенными метками, пайплайн должен fallback-нуться в `Other`.
-
-Переменные окружения для Yandex-классификации:
-
-```env
-YANDEX_CLOUD_API_KEY=<secret API key service account или AI Studio API key>
-YANDEX_CLOUD_FOLDER=<folder_id>
-YANDEX_CLOUD_MODEL=yandexgpt-lite/rc
-YANDEX_CLOUD_BASE_URL=https://rest-assistant.api.cloud.yandex.net/v1
-YANDEX_CACHE_PATH=data/yandex_llm_cache.rds
+ 
+--- 
+ 
+## 8. Yandex LLM: настройка классификатора 
+ 
+`yandex_llm` используется как closed-set классификатор: модель должна выбрать ровно одну тему из фиксированного списка `DEFAULT_SECURITY_TOPICS`. Если ответ модели не совпадает с разрешенными метками, пайплайн должен fallback-нуться в `Other`. 
+ 
+Переменные окружения для Yandex-классификации: 
+ 
+```env 
+YANDEX_CLOUD_API_KEY=<secret API key service account или AI Studio API key> 
+YANDEX_CLOUD_FOLDER=<folder_id> 
+YANDEX_CLOUD_MODEL=yandexgpt-lite/rc 
+YANDEX_CLOUD_BASE_URL=https://rest-assistant.api.cloud.yandex.net/v1 
+YANDEX_CACHE_PATH=data/yandex_llm_cache.rds 
+``` 
+ 
+Практическое правило: 
+ 
+- для заголовка `Authorization: Api-Key <...>` нужен именно **секрет API key**, а не OAuth/IAM token и не ID ключа; 
+- API key должен быть связан с сервисным аккаунтом или создан через AI Studio; 
+- folder id должен соответствовать каталогу, где доступна модель; 
+- секреты нельзя коммитить в репозиторий; 
+- значения нужно хранить в `.env`, переменных окружения или secrets-хранилище. 
+ 
+Пример `.env` для режима `yandex_llm`: 
+ 
+```env 
+CLASSIFY_METHOD=yandex_llm 
+N_TOPICS=8 
+MAX_ARTICLES=500 
+ 
+YANDEX_CLOUD_API_KEY=*** 
+YANDEX_CLOUD_FOLDER=b1gxxxxxxxxxxxxxxx 
+YANDEX_CLOUD_MODEL=yandexgpt-lite/rc 
+YANDEX_CLOUD_BASE_URL=https://rest-assistant.api.cloud.yandex.net/v1 
+YANDEX_CACHE_PATH=data/yandex_llm_cache.rds 
 ```
 
-Практическое правило:
+Инварианты `yandex_llm`-классификации: 
+ 
+- fixed taxonomy; 
+- обязательная тема `Other`; 
+- выбор ровно одной метки; 
+- post-validation ответа модели; 
+- fallback в `Other` для неизвестных меток; 
+- retry + exponential backoff для `429` и `5xx`; 
+- session-cache для повторяющихся текстов; 
+- persistent cache между запусками. 
 
-- для заголовка `Authorization: Api-Key <...>` нужен именно **секрет API key**, а не OAuth/IAM token и не ID ключа;
-- API key должен быть связан с сервисным аккаунтом или создан через AI Studio;
-- folder id должен соответствовать каталогу, где доступна модель;
-- секреты нельзя коммитить в репозиторий;
-- значения нужно хранить в `.env`, переменных окружения или secrets-хранилище.
-
-Пример `.env` для режима `yandex_llm`:
-
-```env
-CLASSIFY_METHOD=yandex_llm
-N_TOPICS=8
-MAX_ARTICLES=500
-
-YANDEX_CLOUD_API_KEY=***
-YANDEX_CLOUD_FOLDER=b1gxxxxxxxxxxxxxxx
-YANDEX_CLOUD_MODEL=yandexgpt-lite/rc
-YANDEX_CLOUD_BASE_URL=https://rest-assistant.api.cloud.yandex.net/v1
-YANDEX_CACHE_PATH=data/yandex_llm_cache.rds
-```
-
-Инварианты `yandex_llm`-классификации:
-
-- fixed taxonomy;
-- обязательная тема `Other`;
-- выбор ровно одной метки;
-- post-validation ответа модели;
-- fallback в `Other` для неизвестных меток;
-- retry + exponential backoff для `429` и `5xx`;
-- session-cache для повторяющихся текстов;
-- persistent cache между запусками.
-
----
-
-## 9. Быстрый старт
-
-### 9.1. Требования
-
-- Docker Desktop;
-- Docker Compose v2;
-- R локально нужен только для ручного запуска и разработки;
-- активный доступ к Yandex Cloud / AI Studio нужен только для `CLASSIFY_METHOD=yandex_llm`.
-
-### 9.2. Клонирование
+--- 
+ 
+## 9. Быстрый старт 
+ 
+### 9.1. Требования 
+ 
+- Docker Desktop; 
+- Docker Compose v2; 
+- R локально нужен только для ручного запуска и разработки; 
+- активный доступ к Yandex Cloud / AI Studio нужен только для `CLASSIFY_METHOD=yandex_llm`. 
+ 
+### 9.2. Клонирование 
 
 ```bash
-git clone https://github.com/AlexeyPetrov1/news-ai-aggregator.git
-cd news-ai-aggregator
+git clone https://github.com/AlexeyPetrov1/news-ai-aggregator.git 
+cd news-ai-aggregator 
 ```
 
-### 9.3. Подготовка `.env`
+### 9.3. Подготовка `.env` 
 
 В корне репозитория лежит **`.env.example`** — готовый шаблон для Docker Compose. Скопируйте его в `.env` и при необходимости отредактируйте:
 
 **Linux / macOS:**
 
-```bash
-cp .env.example .env
-```
+```bash 
+cp .env.example .env 
+``` 
 
 **Windows (PowerShell):**
-
+ 
 ```powershell
 Copy-Item .env.example .env
-```
-
+``` 
+ 
 Минимально проверьте в `.env` (значения уже заданы в шаблоне, обычно достаточно для первого запуска с `lda`):
 
 - `TTRSS_ADMIN_USER` / `TTRSS_ADMIN_PASSWORD` — учётные данные TT-RSS;
@@ -325,11 +325,11 @@ Copy-Item .env.example .env
 - `N_TOPICS` — количество тем (для LDA / K-Means).
 
 > Файл `.env` содержит секреты — не коммитьте его в репозиторий.
-
+ 
 Полная пошаговая инструкция по каждой переменной — в **[разделе 9.4](#94-подробная-инструкция-по-созданию-env)**.
-
----
-
+ 
+--- 
+ 
 ### 9.4. Подробная инструкция по созданию `.env`
 
 #### Шаг 1. Создать `.env` из шаблона
@@ -507,24 +507,24 @@ RUN_ADD_FEEDS_EACH_CYCLE=false
 ---
 
 ## 10. Запуск Docker-образа
-
+ 
 Убедитесь, что **Docker Desktop** установлен и запущен, `.env` заполнен (см. [раздел 9.3–9.4](#93-подготовка-env)), затем из корня репозитория:
-
-```bash
+ 
+```bash 
 docker compose up -d --build
-```
+``` 
 
 Эта одна команда собирает образы и запускает весь стек: TT-RSS, PostgreSQL, ClickHouse, scheduler, Shiny и MCP.
 
 ### Проверка контейнеров
-
+ 
 ```bash
 docker compose ps
 ```
-
+ 
 Ожидаемо — 7 контейнеров (6 сервисов + one-shot `ttrss-init`):
 
-```text
+```text 
 ttrss-db          Up (healthy)
 ttrss             Up (healthy)
 ttrss-init        Exited (0)   ← API включён автоматически
@@ -540,14 +540,14 @@ ttrss-scheduler   Up
 
 Если в `.env` не меняли учётные данные:
 
-```text
-admin / password
-```
-
+```text 
+admin / password 
+``` 
+ 
 **API-доступ включается автоматически** сервисом `ttrss-init`. Ручное включение через UI не требуется.
-
+ 
 ### Остановка и пересборка
-
+ 
 ```bash
 # остановить без удаления данных
 docker compose down
