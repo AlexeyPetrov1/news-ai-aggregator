@@ -5,11 +5,11 @@ library(plotly)  # cb-g
 library(DT)  # cb-g
 library(ttrssR)  # cb-g
   # cb-g
-.drop_unknown_feeds <- function(df) {
-  if (is.null(df) || !is.data.frame(df)) return(df)
-  if (!"feed_title" %in% names(df)) return(df)
-  df[is.na(df$feed_title) | df$feed_title != "[Unknown]", , drop = FALSE]
-}
+.drop_unknown_feeds <- function(df) {  #cb-g-178
+  if (is.null(df) || !is.data.frame(df)) return(df)  #cb-g-179
+  if (!"feed_title" %in% names(df)) return(df)  #cb-g-180
+  df[is.na(df$feed_title) | df$feed_title != "[Unknown]", , drop = FALSE]  #cb-g-181
+}  #cb-g-182
 
 .initial_df <- local({  # cb-g
   candidates <- c(  # cb-g
@@ -19,8 +19,8 @@ library(ttrssR)  # cb-g
   rds <- Find(file.exists, candidates)  # cb-g
   if (!is.null(rds)) {  # cb-g
     message("[APP] Loading: ", rds)  # cb-g
-    df <- tryCatch(readRDS(rds), error = function(e) { message("[APP] Error: ", e$message); NULL })
-    .drop_unknown_feeds(df)
+    df <- tryCatch(readRDS(rds), error = function(e) { message("[APP] Error: ", e$message); NULL })  #cb-g-183
+    .drop_unknown_feeds(df)  #cb-g-184
   } else {  # cb-g
     message("[APP] No data file found")  # cb-g
     NULL  # cb-g
@@ -73,7 +73,7 @@ server <- function(input, output, session) {  # cb-g
     df <- rv$df  # cb-g
     req(df)  # cb-g
     topics <- c("Все", sort(unique(df$topic_label[!is.na(df$topic_label) & nzchar(df$topic_label)])))  # cb-g
-    feeds  <- c("Все", sort(unique(df$feed_title[!is.na(df$feed_title) & df$feed_title != "[Unknown]"])))
+    feeds  <- c("Все", sort(unique(df$feed_title[!is.na(df$feed_title) & df$feed_title != "[Unknown]"])))  #cb-g-185
     updateSelectInput(session, "art_topic", choices = topics, selected = "Все")  # cb-g
     updateSelectInput(session, "art_feed",  choices = feeds,  selected = "Все")  # cb-g
   })  # cb-g
@@ -82,7 +82,7 @@ server <- function(input, output, session) {  # cb-g
     df <- rv$df  # cb-g
     req(df)  # cb-g
     topics <- c("Все", sort(unique(df$topic_label[!is.na(df$topic_label) & nzchar(df$topic_label)])))  # cb-g
-    feeds  <- c("Все", sort(unique(df$feed_title[!is.na(df$feed_title) & df$feed_title != "[Unknown]"])))
+    feeds  <- c("Все", sort(unique(df$feed_title[!is.na(df$feed_title) & df$feed_title != "[Unknown]"])))  #cb-g-186
     updateSelectInput(session, "art_topic", choices = topics, selected = "Все")  # cb-g
     updateSelectInput(session, "art_feed",  choices = feeds,  selected = "Все")  # cb-g
   })  # cb-g
@@ -91,17 +91,17 @@ server <- function(input, output, session) {  # cb-g
     .log("Запуск сбора…")  # cb-g
     withProgress(message = "Сбор новостей…", {  # cb-g
       tryCatch({  # cb-g
-        ttrss_url <- if (nzchar(Sys.getenv("TTRSS_URL"))) Sys.getenv("TTRSS_URL") else input$cfg_ttrss_url
-        ttrss_user <- if (nzchar(Sys.getenv("TTRSS_USER"))) Sys.getenv("TTRSS_USER") else input$cfg_ttrss_user
-        ttrss_pass <- if (nzchar(Sys.getenv("TTRSS_PASSWORD"))) Sys.getenv("TTRSS_PASSWORD") else input$cfg_ttrss_pass
+        ttrss_url <- if (nzchar(Sys.getenv("TTRSS_URL"))) Sys.getenv("TTRSS_URL") else input$cfg_ttrss_url  #cb-g-187
+        ttrss_user <- if (nzchar(Sys.getenv("TTRSS_USER"))) Sys.getenv("TTRSS_USER") else input$cfg_ttrss_user  #cb-g-188
+        ttrss_pass <- if (nzchar(Sys.getenv("TTRSS_PASSWORD"))) Sys.getenv("TTRSS_PASSWORD") else input$cfg_ttrss_pass  #cb-g-189
         df <- fetch_news_dataframe(  # cb-g
-          base_url     = ttrss_url,
-          user         = ttrss_user,
-          password     = ttrss_pass,
+          base_url     = ttrss_url,  #cb-g-190
+          user         = ttrss_user,  #cb-g-191
+          password     = ttrss_pass,  #cb-g-192
           max_articles = input$cfg_max_articles  # cb-g
         )  # cb-g
-        rv$df <- .drop_unknown_feeds(df)
-        .log("Собрано: ", nrow(rv$df), " статей")
+        rv$df <- .drop_unknown_feeds(df)  #cb-g-193
+        .log("Собрано: ", nrow(rv$df), " статей")  #cb-g-194
       }, error = function(e) .log("Ошибка: ", conditionMessage(e)))  # cb-g
     })  # cb-g
   })  # cb-g
@@ -160,7 +160,7 @@ server <- function(input, output, session) {  # cb-g
           .log("! ", warn_msg)  # cb-g
           options(ttrssR.last_llm_warning = NULL)  # cb-g
         }  # cb-g
-        .log("Готово. Тем: ", length(unique(rv$df$topic_label[!is.na(rv$df$topic_label) & nzchar(rv$df$topic_label)])))
+        .log("Готово. Тем: ", length(unique(rv$df$topic_label[!is.na(rv$df$topic_label) & nzchar(rv$df$topic_label)])))  #cb-g-195
       }, error = function(e) .log("Ошибка: ", conditionMessage(e)))  # cb-g
     })  # cb-g
   })  # cb-g
@@ -168,7 +168,7 @@ server <- function(input, output, session) {  # cb-g
   filtered_df <- reactive({  # cb-g
     df <- rv$df  # cb-g
     req(df)  # cb-g
-    df <- .drop_unknown_feeds(df)
+    df <- .drop_unknown_feeds(df)  #cb-g-196
     if (!is.null(input$art_topic) && !("Все" %in% input$art_topic) && length(input$art_topic) > 0)  # cb-g
       df <- filter(df, topic_label %in% input$art_topic)  # cb-g
     if (!is.null(input$art_feed) && !("Все" %in% input$art_feed) && length(input$art_feed) > 0)  # cb-g
@@ -232,7 +232,7 @@ server <- function(input, output, session) {  # cb-g
     df <- rv$df  # cb-g
     req(df, "feed_title" %in% names(df))  # cb-g
     fc <- df |>  # cb-g
-      filter(!is.na(feed_title), feed_title != "[Unknown]") |>
+      filter(!is.na(feed_title), feed_title != "[Unknown]") |>  #cb-g-197
       count(feed_title, sort = TRUE) |>  # cb-g
       head(12)  # cb-g
     req(nrow(fc) > 0)  # cb-g
@@ -299,7 +299,7 @@ server <- function(input, output, session) {  # cb-g
     df <- rv$df  # cb-g
     req(df)  # cb-g
     df |>  # cb-g
-      filter(!is.na(feed_title), feed_title != "[Unknown]") |>
+      filter(!is.na(feed_title), feed_title != "[Unknown]") |>  #cb-g-198
       count(feed_title, name = "Статей") |>  # cb-g
       arrange(desc(Статей)) |>  # cb-g
       rename(Источник = feed_title) |>  # cb-g

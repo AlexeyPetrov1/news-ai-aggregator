@@ -1,52 +1,52 @@
-## ============================================================
-## TT-RSS Stack (standalone макет)
-## Образ: wangqiru/ttrss — all-in-one (PHP + Nginx + крон)
-##
-## Запуск:  docker compose -f docker/ttrss/docker-compose.yml up -d
-## Доступ:  http://localhost:8080
-## Логин:   admin / password
-## ============================================================
+## ============================================================  #cb-g-1
+## TT-RSS Stack (standalone макет)  #cb-g-2
+## Образ: wangqiru/ttrss — all-in-one (PHP + Nginx + крон)  #cb-g-3
+##  #cb-g-4
+## Запуск:  docker compose -f docker/ttrss/docker-compose.yml up -d  #cb-g-5
+## Доступ:  http://localhost:8080  #cb-g-6
+## Логин:   admin / password  #cb-g-7
+## ============================================================  #cb-g-8
 
-services:
+services:  #cb-g-9
 
-  # ── PostgreSQL для TT-RSS ─────────────────────────────────────────────────
-  ttrss-db:
-    image: postgres:15-alpine
-    container_name: ttrss-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER:     ttrss
-      POSTGRES_PASSWORD: ${TTRSS_DB_PASSWORD:-ttrss_secret}
-      POSTGRES_DB:       ttrss
-    volumes:
-      - ttrss_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ttrss"]
-      interval: 10s
-      timeout:  5s
-      retries:  5
+  # ── PostgreSQL для TT-RSS ─────────────────────────────────────────────────  #cb-g-10
+  ttrss-db:  #cb-g-11
+    image: postgres:15-alpine  #cb-g-12
+    container_name: ttrss-db  #cb-g-13
+    restart: unless-stopped  #cb-g-14
+    environment:  #cb-g-15
+      POSTGRES_USER:     ttrss  #cb-g-16
+      POSTGRES_PASSWORD: ${TTRSS_DB_PASSWORD:-ttrss_secret}  #cb-g-17
+      POSTGRES_DB:       ttrss  #cb-g-18
+    volumes:  #cb-g-19
+      - ttrss_db_data:/var/lib/postgresql/data  #cb-g-20
+    healthcheck:  #cb-g-21
+      test: ["CMD-SHELL", "pg_isready -U ttrss"]  #cb-g-22
+      interval: 10s  #cb-g-23
+      timeout:  5s  #cb-g-24
+      retries:  5  #cb-g-25
 
-  # ── TT-RSS (all-in-one: PHP-FPM + Nginx + обновлятор) ────────────────────
-  ttrss:
-    image: wangqiru/ttrss:latest
-    container_name: ttrss
-    restart: unless-stopped
-    depends_on:
-      ttrss-db:
-        condition: service_healthy
-    ports:
-      - "${TTRSS_PORT:-8080}:80"
-    environment:
-      SELF_URL_PATH: http://localhost:${TTRSS_PORT:-8080}/
-      DB_HOST:       ttrss-db
-      DB_PORT:       5432
-      DB_NAME:       ttrss
-      DB_USER:       ttrss
-      DB_PASS:       ${TTRSS_DB_PASSWORD:-ttrss_secret}
-      ENABLE_PLUGINS: auth_internal,fever
-    volumes:
-      - ttrss_data:/var/www/html/tt-rss/feed-icons
+  # ── TT-RSS (all-in-one: PHP-FPM + Nginx + обновлятор) ────────────────────  #cb-g-26
+  ttrss:  #cb-g-27
+    image: wangqiru/ttrss:latest  #cb-g-28
+    container_name: ttrss  #cb-g-29
+    restart: unless-stopped  #cb-g-30
+    depends_on:  #cb-g-31
+      ttrss-db:  #cb-g-32
+        condition: service_healthy  #cb-g-33
+    ports:  #cb-g-34
+      - "${TTRSS_PORT:-8080}:80"  #cb-g-35
+    environment:  #cb-g-36
+      SELF_URL_PATH: http://localhost:${TTRSS_PORT:-8080}/  #cb-g-37
+      DB_HOST:       ttrss-db  #cb-g-38
+      DB_PORT:       5432  #cb-g-39
+      DB_NAME:       ttrss  #cb-g-40
+      DB_USER:       ttrss  #cb-g-41
+      DB_PASS:       ${TTRSS_DB_PASSWORD:-ttrss_secret}  #cb-g-42
+      ENABLE_PLUGINS: auth_internal,fever  #cb-g-43
+    volumes:  #cb-g-44
+      - ttrss_data:/var/www/html/tt-rss/feed-icons  #cb-g-45
 
-volumes:
-  ttrss_db_data:
-  ttrss_data:
+volumes:  #cb-g-46
+  ttrss_db_data:  #cb-g-47
+  ttrss_data:  #cb-g-48
