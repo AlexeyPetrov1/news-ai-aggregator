@@ -301,7 +301,7 @@ cd news-ai-aggregator
 
 ### 9.3. Подготовка `.env`
 
-Скопируйте шаблон:
+В корне репозитория лежит **`.env.example`** — готовый шаблон для Docker Compose. Скопируйте его в `.env` и при необходимости отредактируйте:
 
 **Linux / macOS:**
 
@@ -315,7 +315,7 @@ cp .env.example .env
 Copy-Item .env.example .env
 ```
 
-Минимально проверьте и при необходимости измените:
+Минимально проверьте в `.env` (значения уже заданы в шаблоне, обычно достаточно для первого запуска с `lda`):
 
 - `TTRSS_ADMIN_USER` / `TTRSS_ADMIN_PASSWORD` — учётные данные TT-RSS;
 - `CH_DB`, `CH_USER`, `CH_PASSWORD` — параметры ClickHouse;
@@ -332,35 +332,15 @@ Copy-Item .env.example .env
 
 ### 9.4. Подробная инструкция по созданию `.env`
 
-#### Шаг 1. Создать файл
-
-В корне репозитория создайте `.env` на основе шаблона:
-
-**Linux / macOS:**
+#### Шаг 1. Создать `.env` из шаблона
 
 ```bash
 cp .env.example .env
 ```
 
-**Windows (PowerShell):**
+(Windows: `Copy-Item .env.example .env`)
 
-```powershell
-Copy-Item .env.example .env
-```
-
-Если `.env.example` отсутствует, создайте файл вручную:
-
-**Linux / macOS:**
-
-```bash
-touch .env
-```
-
-**Windows (PowerShell):**
-
-```powershell
-New-Item .env -ItemType File
-```
+Файл `.env.example` в репозитории содержит минимальный набор для `docker compose up` с методом `lda`. Секреты (API keys) добавляйте только в `.env`, не в `.env.example`.
 
 ---
 
@@ -518,41 +498,11 @@ RUN_ADD_FEEDS_EACH_CYCLE=false
 
 ---
 
-#### Итоговый минимальный `.env` для запуска через Docker Compose (метод `lda`)
+#### Итоговый минимальный `.env`
 
-```env
-# TT-RSS (для локальных R-скриптов на хосте; в compose URL = http://ttrss/)
-TTRSS_URL=http://localhost:8080
-TTRSS_USER=admin
-TTRSS_PASSWORD=password
-TTRSS_ADMIN_USER=admin
-TTRSS_ADMIN_PASSWORD=password
+Содержимое совпадает с **`.env.example`** в корне репозитория. После `cp .env.example .env` дополнительно править файл не обязательно для первого запуска с `lda`.
 
-# ClickHouse
-CH_HOST=clickhouse
-CH_PORT=9000
-CH_HTTP_PORT=8123
-CH_DB=ttrss
-CH_USER=default
-CH_PASSWORD=
-
-# Сбор данных
-MAX_ARTICLES=500
-SCHEDULER_INTERVAL_SECONDS=3600
-
-# Классификация (lda — без внешних API)
-CLASSIFY_METHOD=lda
-N_TOPICS=8
-
-# Scheduler
-INIT_FEEDS_ON_START=true
-INIT_FEEDS_RETRY_MAX=5
-INIT_FEEDS_RETRY_DELAY_SECONDS=30
-CONTINUE_ON_FEEDS_INIT_ERROR=true
-RUN_ADD_FEEDS_EACH_CYCLE=false
-```
-
-> Файл `.env` содержит секреты и не должен попадать в репозиторий. Убедитесь, что `.env` есть в `.gitignore`.
+> Файл **`.env`** содержит локальные секреты и не коммитится (см. `.gitignore`). Шаблон **`.env.example`** в git можно менять только без реальных ключей.
 
 ---
 

@@ -15,7 +15,9 @@ inst/shiny/data/
 # Секреты
 .env
 .env.*
+!.env.example
 *.env
+!*.env.example
 
 # Временные отладочные скрипты
 data-raw/_*.R
