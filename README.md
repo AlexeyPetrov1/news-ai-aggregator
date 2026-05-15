@@ -102,7 +102,7 @@ TT-RSS -> нормализация -> topic classification -> ClickHouse -> Shin
 | `ttrss-init` | one-shot: включает API-доступ для admin |
 | `clickhouse` | аналитическое хранилище |
 | `scheduler` | периодический запуск `fetch_news.R`; основной ingestion path |
-| `shiny` | UI-дашборд (вкладки: Обзор, Новости, Метки, Источники, Настройки) |
+| `shiny` | UI-дашборд (вкладки: Обзор, Новости, Источники, Настройки) |
 | `mcp` | JSON-RPC endpoint с MCP-инструментами |
 
 ---
@@ -118,6 +118,16 @@ TT-RSS -> нормализация -> topic classification -> ClickHouse -> Shin
 | MCP healthcheck | `http://localhost:8000/health` |
 | ClickHouse HTTP | `http://localhost:8123` |
 
+### TT-RSS: порты и URL
+
+| Где обращаемся | URL | Пояснение |
+|---|---|---|
+| Браузер на вашем компьютере | `http://localhost:8080` | Порт **8080** на хосте проброшен в контейнер `ttrss` (внутри контейнера веб-сервер слушает **80**) |
+| R-скрипты внутри Docker Compose | `http://ttrss/` | Имя сервиса в сети compose; **без** `:8080` — в `docker-compose.yml` уже задано так для `scheduler` и `shiny` |
+| R-скрипты на хосте (вне Docker) | `http://localhost:8080` | Когда TT-RSS запущен через compose, а R — локально |
+
+Переменная `TTRSS_PORT` в `.env` меняет только внешний порт на хосте (по умолчанию `8080`). Внутри Docker-сети TT-RSS всегда доступен по порту **80**.
+
 Логин и пароль TT-RSS по умолчанию, если они не изменены в `.env` или compose-файлах:
 
 ```text
@@ -126,38 +136,15 @@ admin / password
 
 ---
 
-## 5. Метки (Labels)
-
-Вкладка **Метки** в Shiny-дашборде позволяет управлять TT-RSS-метками:
-
-- **Создание** меток с названием и цветом — через PostgreSQL напрямую
-- **Просмотр** списка меток через TT-RSS API (`getLabels`)
-- **Назначение** меток на статьи через API (`setArticleLabel`)
-- **Фильтрация** статей по темам перед назначением
-
-API-функции в `R/api.R`:
-- `ttrss_get_labels()` — список меток (через TT-RSS API)
-- `ttrss_set_article_label()` — назначить/снять метку
-
-Управление в `R/labels.R` (создание/удаление — напрямую в PostgreSQL):
-- `ttrss_create_label()` — создать метку
-- `ttrss_create_label_api()` — создать и получить API-ID
-- `ttrss_delete_label()` — удалить
-- `ttrss_find_label_api_id()` — найти API-ID по названию
-- `ttrss_get_article_labels()` — метки конкретных статей
-- `ttrss_bulk_label_articles()` — массовое назначение
-
----
-
-## 6. Технологии
+## 5. Технологии
 
 | Слой | Технологии |
 |---|---|
 | Core | R, package-based структура |
 | RSS ingestion | TT-RSS JSON API |
 | ETL | R scripts в `R/` и `data-raw/` |
-| ML / NLP | `lda`, `kmeans`, `yandex_llm` |
-| LLM-классификация | Yandex GPT / Yandex AI Studio API |
+| ML / NLP | `lda`, `kmeans`, `yandex_llm`, `llm` |
+| LLM-классификация | Yandex GPT; универсальный `llm` (OpenAI-совместимые, Anthropic, Gemini, Ollama через `ellmer`) |
 | Storage | ClickHouse |
 | Dashboard | Shiny, shinydashboard, plotly, DT |
 | Agent API | MCP over JSON-RPC 2.0 |
@@ -170,8 +157,8 @@ API-функции в `R/api.R`:
 ```text
 news-ai-aggregator/
 ├── R/
-│   ├── api.R                         # клиент TT-RSS API (включая labels)
-│   ├── labels.R                      # управление метками TT-RSS
+│   ├── api.R                         # клиент TT-RSS API
+│   ├── labels.R                      # управление метками TT-RSS (R API, не вкладка Shiny)
 │   ├── etl.R                         # сбор и нормализация данных
 │   ├── classify.R                    # lda / kmeans / yandex_llm + quality logic
 │   ├── ground_truth.R                # optional validation utilities
@@ -241,7 +228,9 @@ CH_HOST=localhost
 CH_PORT=9000
 ```
 
-Если в старых скриптах используются переменные `TTRSS_URL`, `TTRSS_USER`, `TTRSS_PASSWORD`, проверьте фактический код и `.env.example`. В актуальном Docker-контуре основными считаются `TTRSS_ADMIN_USER` и `TTRSS_ADMIN_PASSWORD`.
+Для TT-RSS в Docker Compose в `docker-compose.yml` уже задано `TTRSS_URL=http://ttrss/` (порт **80** внутри сети). Менять на `http://ttrss:8080` не нужно — с хоста TT-RSS открывается как `http://localhost:8080`, это другой контекст.
+
+Для ручного запуска R на хосте используйте `TTRSS_URL=http://localhost:8080`, `TTRSS_USER`, `TTRSS_PASSWORD`. Учётные данные совпадают с `TTRSS_ADMIN_USER` / `TTRSS_ADMIN_PASSWORD`, если вы их не меняли.
 
 ---
 
@@ -332,7 +321,7 @@ Copy-Item .env.example .env
 - `CH_DB`, `CH_USER`, `CH_PASSWORD` — параметры ClickHouse;
 - `MAX_ARTICLES` — лимит статей за цикл;
 - `SCHEDULER_INTERVAL_SECONDS` — частота опроса (секунды);
-- `CLASSIFY_METHOD` — метод классификации (`lda`, `kmeans`, `yandex_llm`);
+- `CLASSIFY_METHOD` — метод классификации (`lda`, `kmeans`, `yandex_llm`, `llm`);
 - `N_TOPICS` — количество тем (для LDA / K-Means).
 
 > Файл `.env` содержит секреты — не коммитьте его в репозиторий.
@@ -378,21 +367,21 @@ New-Item .env -ItemType File
 #### Шаг 2. TT-RSS
 
 ```env
-# URL TT-RSS API
-# При запуске через Docker Compose оставьте http://ttrss:8080
-# При ручном локальном запуске R-скриптов используйте http://localhost:8080
-TTRSS_URL=http://ttrss:8080
+# URL TT-RSS API (для R-скриптов на хосте, когда compose уже запущен)
+TTRSS_URL=http://localhost:8080
 
-# Учётные данные пользователя TT-RSS (используются R-скриптами)
+# Учётные данные пользователя TT-RSS (R-скрипты, scheduler, shiny)
 TTRSS_USER=admin
 TTRSS_PASSWORD=password
 
-# Учётные данные администратора (используются Docker Compose для конфигурации сервиса)
+# Учётные данные администратора (конфигурация сервиса)
 TTRSS_ADMIN_USER=admin
 TTRSS_ADMIN_PASSWORD=password
 ```
 
-Если при первом входе в TT-RSS вы изменили пароль администратора — укажите актуальные значения во всех четырёх переменных.
+> **Внутри Docker Compose** `scheduler` и `shiny` получают `TTRSS_URL=http://ttrss/` из `docker-compose.yml` (порт **80** в сети контейнеров). В `.env` для compose **не** указывайте `http://ttrss:8080` — этот адрес сработает только с вашего компьютера, не из контейнера.
+
+Если при первом входе в TT-RSS вы изменили пароль администратора — укажите актуальные значения в `TTRSS_USER` / `TTRSS_PASSWORD` (и при необходимости в `TTRSS_ADMIN_*`).
 
 ---
 
@@ -435,7 +424,7 @@ SCHEDULER_INTERVAL_SECONDS=3600
 
 #### Шаг 5. Метод классификации
 
-Поддерживаются три метода. Выберите один в зависимости от ваших потребностей:
+Поддерживаются четыре метода. Выберите один в зависимости от ваших потребностей:
 
 **Вариант A — `lda` (по умолчанию, не требует внешних сервисов):**
 
@@ -481,6 +470,29 @@ YANDEX_CACHE_PATH=data/yandex_llm_cache.rds
 3. Перейдите в **IAM → Сервисные аккаунты**, создайте сервисный аккаунт и назначьте ему роль `ai.languageModels.user`.
 4. В настройках сервисного аккаунта создайте **API-ключ** и скопируйте **Секрет** — это `YANDEX_CLOUD_API_KEY`.
 
+**Вариант D — `llm` (универсальная LLM-классификация через `ellmer`):**
+
+Подходит для OpenAI, OpenAI-совместимых API (DeepSeek, Groq и др.), Anthropic Claude, Google Gemini и локального Ollama. Требуется API key (кроме Ollama).
+
+```env
+CLASSIFY_METHOD=llm
+N_TOPICS=8
+
+# Провайдер: openai | anthropic | gemini | ollama
+LLM_PROVIDER=openai
+
+# API key (для ollama можно оставить пустым)
+LLM_API_KEY=<ваш-api-key>
+
+# Модель (примеры: gpt-4o-mini, deepseek-chat, claude-3-5-haiku-latest, gemini-2.0-flash)
+LLM_MODEL=gpt-4o-mini
+
+# Base URL: пусто = OpenAI; DeepSeek: https://api.deepseek.com; Ollama: http://host.docker.internal:11434
+LLM_BASE_URL=
+```
+
+В Shiny те же параметры задаются на вкладке **Настройки** (метод «LLM (любой провайдер)»). Для `scheduler` в Docker добавьте переменные в `.env`, если классификация должна идти через `llm` в автоматическом цикле (по умолчанию в compose — `lda`).
+
 ---
 
 #### Шаг 6. Параметры поведения scheduler (опционально)
@@ -509,8 +521,8 @@ RUN_ADD_FEEDS_EACH_CYCLE=false
 #### Итоговый минимальный `.env` для запуска через Docker Compose (метод `lda`)
 
 ```env
-# TT-RSS
-TTRSS_URL=http://ttrss:8080
+# TT-RSS (для локальных R-скриптов на хосте; в compose URL = http://ttrss/)
+TTRSS_URL=http://localhost:8080
 TTRSS_USER=admin
 TTRSS_PASSWORD=password
 TTRSS_ADMIN_USER=admin
@@ -917,10 +929,11 @@ docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT co
 | `lda` | тематическое моделирование через `topicmodels::LDA` |
 | `kmeans` | baseline-кластеризация по TF-IDF |
 | `yandex_llm` | closed-set классификация через Yandex GPT |
+| `llm` | closed-set классификация через выбранного LLM-провайдера (`ellmer`) |
 
-`yandex_llm` лучше использовать, если нужна интерпретируемая классификация в фиксированную бизнес-таксономию.
+`yandex_llm` и `llm` удобны, если нужны понятные названия тем из фиксированной таксономии.
 
-`lda` и `kmeans` полезны как baseline и как способ быстро проверить структуру корпуса без LLM.
+`lda` и `kmeans` полезны как baseline и как способ быстро проверить структуру корпуса без внешних API.
 
 ### 19.1. Ненадзорные метрики качества
 
@@ -1202,8 +1215,8 @@ testthat::test_dir("tests/testthat")
 
 ```text
 Реализован ETL + ML/NLP-пайплайн тематической классификации новостей по кибербезопасности.
-Данные собираются из TT-RSS, нормализуются, классифицируются методами lda / kmeans / yandex_llm,
-сохраняются в ClickHouse и доступны через Shiny dashboard и MCP JSON-RPC endpoint.
+Данные собираются из TT-RSS, нормализуются, классифицируются методами lda / kmeans / yandex_llm / llm,
+сохраняются в ClickHouse и доступны через Shiny dashboard и MCP JSON-RPC endpoint (методы: `lda`, `kmeans`, `yandex_llm`, `llm`).
 ```
 
 Не очень корректно:
