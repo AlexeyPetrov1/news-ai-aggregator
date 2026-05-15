@@ -115,7 +115,7 @@ ui <- dashboardPage(
                             value = Sys.getenv("LLM_API_KEY", "")),
               textInput("cfg_llm_model", "Модель (любое название)",
                         value = "",
-                        placeholder = "deepseek-v4-flash  /  gpt-4o-mini  /  llama3.2  …"),
+                        placeholder = "deepseek-chat  /  gpt-4o-mini  /  llama3.2  …"),
               textInput("cfg_llm_base_url", "Base URL",
                         value = "",
                         placeholder = "пусто = OpenAI  |  DeepSeek: https://api.deepseek.com"),
@@ -123,7 +123,7 @@ ui <- dashboardPage(
                 tags$b("OpenAI:"), "оставьте Base URL пустым.", tags$br(),
                 tags$b("DeepSeek:"), tags$code("https://api.deepseek.com"),
                 "— /v1 добавляется автоматически.",
-                "Модели: deepseek-v4-flash / deepseek-v4-pro.", tags$br(),
+                "Модели: deepseek-chat (V3) / deepseek-reasoner (R1).", tags$br(),
                 tags$b("Groq:"), tags$code("https://api.groq.com/openai/v1"), tags$br(),
                 tags$b("Ollama:"), "Base URL = http://localhost:11434."
               ),

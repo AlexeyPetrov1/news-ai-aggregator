@@ -602,8 +602,10 @@ classify_news <- function(df,  #contrib-balance-g-284
     return(paste0("Недостаточно средств на балансе. ",  #contrib-balance-g-633
                   "Пополните счёт на платформе провайдера (например platform.deepseek.com). ",  #contrib-balance-g-634
                   "API-ключ и настройки верны."))  #contrib-balance-g-635
-  if (grepl("401|Unauthorized|invalid api key|incorrect api", msg, ignore.case = TRUE))  #contrib-balance-g-636
-    return("Неверный API-ключ (HTTP 401). Проверьте поле «API Key».")  #contrib-balance-g-637
+  if (grepl("401|Unauthorized|invalid api key|incorrect api|Authentication Fail|is invalid|api key.*invalid|invalid.*api key", msg, ignore.case = TRUE))  #contrib-balance-g-636
+    return(paste0("Неверный API-ключ. Для DeepSeek: зайдите на platform.deepseek.com → API Keys → ",
+                  "создайте новый ключ (он начинается с «sk-»). ",
+                  "Модели DeepSeek: deepseek-chat (V3) или deepseek-reasoner (R1)."))  #contrib-balance-g-637
   if (grepl("404|not found|No such model|does not exist", msg, ignore.case = TRUE))  #contrib-balance-g-638
     return(paste0("Модель или endpoint не найдены (HTTP 404). ",  #contrib-balance-g-639
                   "Проверьте имя модели. Base URL вводится без /v1 ",  #contrib-balance-g-640
