@@ -548,7 +548,7 @@ admin / password
  
 ### Остановка и пересборка
  
-```bash
+```bash<!-- cb-k-1 -->
 # остановить без удаления данных
 docker compose down
 
@@ -557,335 +557,335 @@ docker compose up -d --build
 ```
 
 
----
+---<!-- cb-k-2 -->
 
-## 11. Добавление RSS-фидов
-### Данный этап необходим только в случае, если за 5 минут у вас не подтянулись новости
+## 11. Добавление RSS-фидов<!-- cb-k-3 -->
+### Данный этап необходим только в случае, если за 5 минут у вас не подтянулись новости<!-- cb-k-4 -->
 
-Если фиды еще не добавлены, можно выполнить соответствующий script.
+Если фиды еще не добавлены, можно выполнить соответствующий script.<!-- cb-k-5 -->
 
-Локально, при настроенном R-окружении:
+Локально, при настроенном R-окружении:<!-- cb-k-6 -->
 
-```r
-source("data-raw/add_security_feeds.R")
-```
+```r<!-- cb-k-7 -->
+source("data-raw/add_security_feeds.R")<!-- cb-k-8 -->
+```<!-- cb-k-9 -->
 
-Или внутри контейнера, если в нем доступны исходники проекта и R-зависимости:
+Или внутри контейнера, если в нем доступны исходники проекта и R-зависимости:<!-- cb-k-10 -->
 
-```bash
-docker exec -it ttrss-scheduler Rscript data-raw/add_security_feeds.R
-```
+```bash<!-- cb-k-11 -->
+docker exec -it ttrss-scheduler Rscript data-raw/add_security_feeds.R<!-- cb-k-12 -->
+```<!-- cb-k-13 -->
 
-Если появляется `API_DISABLED`, сначала включите TT-RSS API.
+Если появляется `API_DISABLED`, сначала включите TT-RSS API.<!-- cb-k-14 -->
 
----
+---<!-- cb-k-15 -->
 
-## 12. Scheduler-first workflow
+## 12. Scheduler-first workflow<!-- cb-k-16 -->
 
-`scheduler` — основной способ регулярного обновления данных.
+`scheduler` — основной способ регулярного обновления данных.<!-- cb-k-17 -->
 
-Запуск только scheduler:
+Запуск только scheduler:<!-- cb-k-18 -->
 
-```bash
-docker compose up -d --build scheduler
-```
+```bash<!-- cb-k-19 -->
+docker compose up -d --build scheduler<!-- cb-k-20 -->
+```<!-- cb-k-21 -->
 
-Логи:
+Логи:<!-- cb-k-22 -->
 
-```bash
-docker logs -f ttrss-scheduler
-```
+```bash<!-- cb-k-23 -->
+docker logs -f ttrss-scheduler<!-- cb-k-24 -->
+```<!-- cb-k-25 -->
 
-Ожидаемое поведение:
+Ожидаемое поведение:<!-- cb-k-26 -->
 
-- повторяющиеся циклы `fetch_news`;
-- отсутствие fatal errors;
-- создание таблиц в ClickHouse;
-- рост количества строк в `articles` при появлении новых статей.
+- повторяющиеся циклы `fetch_news`;<!-- cb-k-27 -->
+- отсутствие fatal errors;<!-- cb-k-28 -->
+- создание таблиц в ClickHouse;<!-- cb-k-29 -->
+- рост количества строк в `articles` при появлении новых статей.<!-- cb-k-30 -->
 
-Проверить, что scheduler жив:
+Проверить, что scheduler жив:<!-- cb-k-31 -->
 
-```bash
-docker compose ps
-```
+```bash<!-- cb-k-32 -->
+docker compose ps<!-- cb-k-33 -->
+```<!-- cb-k-34 -->
 
----
+---<!-- cb-k-35 -->
 
-## 13. Проверка ClickHouse
+## 13. Проверка ClickHouse<!-- cb-k-36 -->
 
-Показать базы:
+Показать базы:<!-- cb-k-37 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --query "SHOW DATABASES"
-```
+```bash<!-- cb-k-38 -->
+docker exec -it clickhouse clickhouse-client --query "SHOW DATABASES"<!-- cb-k-39 -->
+```<!-- cb-k-40 -->
 
-Показать таблицы в базе `ttrss`:
+Показать таблицы в базе `ttrss`:<!-- cb-k-41 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "SHOW TABLES"
-```
+```bash<!-- cb-k-42 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "SHOW TABLES"<!-- cb-k-43 -->
+```<!-- cb-k-44 -->
 
-Ожидаемые таблицы:
+Ожидаемые таблицы:<!-- cb-k-45 -->
 
-```text
-articles
-feeds
-topic_summary
-```
+```text<!-- cb-k-46 -->
+articles<!-- cb-k-47 -->
+feeds<!-- cb-k-48 -->
+topic_summary<!-- cb-k-49 -->
+```<!-- cb-k-50 -->
 
-Проверить количество статей:
+Проверить количество статей:<!-- cb-k-51 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT count() FROM articles FINAL"
-```
+```bash<!-- cb-k-52 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT count() FROM articles FINAL"<!-- cb-k-53 -->
+```<!-- cb-k-54 -->
 
-Ожидаемо:
+Ожидаемо:<!-- cb-k-55 -->
 
-```text
-count() > 0
-```
+```text<!-- cb-k-56 -->
+count() > 0<!-- cb-k-57 -->
+```<!-- cb-k-58 -->
 
-Посмотреть последние статьи:
+Посмотреть последние статьи:<!-- cb-k-59 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "
-SELECT published_at, feed_title, topic_label, title
-FROM articles FINAL
-ORDER BY published_at DESC
-LIMIT 10
-"
-```
+```bash<!-- cb-k-60 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "<!-- cb-k-61 -->
+SELECT published_at, feed_title, topic_label, title<!-- cb-k-62 -->
+FROM articles FINAL<!-- cb-k-63 -->
+ORDER BY published_at DESC<!-- cb-k-64 -->
+LIMIT 10<!-- cb-k-65 -->
+"<!-- cb-k-66 -->
+```<!-- cb-k-67 -->
 
-Проверить распределение тем:
+Проверить распределение тем:<!-- cb-k-68 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "
-SELECT topic_label, count() AS n
-FROM articles FINAL
-GROUP BY topic_label
-ORDER BY n DESC
-"
-```
+```bash<!-- cb-k-69 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "<!-- cb-k-70 -->
+SELECT topic_label, count() AS n<!-- cb-k-71 -->
+FROM articles FINAL<!-- cb-k-72 -->
+GROUP BY topic_label<!-- cb-k-73 -->
+ORDER BY n DESC<!-- cb-k-74 -->
+"<!-- cb-k-75 -->
+```<!-- cb-k-76 -->
 
-Проверить свежесть данных:
+Проверить свежесть данных:<!-- cb-k-77 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "
-SELECT
-    min(published_at) AS first_article,
-    max(published_at) AS last_article,
-    max(fetched_at) AS last_fetch
-FROM articles FINAL
-"
-```
+```bash<!-- cb-k-78 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "<!-- cb-k-79 -->
+SELECT<!-- cb-k-80 -->
+    min(published_at) AS first_article,<!-- cb-k-81 -->
+    max(published_at) AS last_article,<!-- cb-k-82 -->
+    max(fetched_at) AS last_fetch<!-- cb-k-83 -->
+FROM articles FINAL<!-- cb-k-84 -->
+"<!-- cb-k-85 -->
+```<!-- cb-k-86 -->
 
-Важно: для SQL-запросов указывайте `--database ttrss`. Без этого `clickhouse-client` может использовать базу `default`, и запрос к `articles` завершится ошибкой.
+Важно: для SQL-запросов указывайте `--database ttrss`. Без этого `clickhouse-client` может использовать базу `default`, и запрос к `articles` завершится ошибкой.<!-- cb-k-87 -->
 
----
+---<!-- cb-k-88 -->
 
-## 14. Контроль качества данных
+## 14. Контроль качества данных<!-- cb-k-89 -->
 
-Проверить критичные пустые поля:
+Проверить критичные пустые поля:<!-- cb-k-90 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "
-SELECT
-    count() AS total,
-    countIf(article_id = 0) AS bad_article_id,
-    countIf(title = '') AS empty_title,
-    countIf(content_text = '') AS empty_content_text,
-    countIf(feed_id = 0) AS empty_feed_id,
-    countIf(topic_label = '') AS empty_topic_label
-FROM articles FINAL
-"
-```
+```bash<!-- cb-k-91 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "<!-- cb-k-92 -->
+SELECT<!-- cb-k-93 -->
+    count() AS total,<!-- cb-k-94 -->
+    countIf(article_id = 0) AS bad_article_id,<!-- cb-k-95 -->
+    countIf(title = '') AS empty_title,<!-- cb-k-96 -->
+    countIf(content_text = '') AS empty_content_text,<!-- cb-k-97 -->
+    countIf(feed_id = 0) AS empty_feed_id,<!-- cb-k-98 -->
+    countIf(topic_label = '') AS empty_topic_label<!-- cb-k-99 -->
+FROM articles FINAL<!-- cb-k-100 -->
+"<!-- cb-k-101 -->
+```<!-- cb-k-102 -->
 
-Интерпретация:
+Интерпретация:<!-- cb-k-103 -->
 
-- `bad_article_id > 0` — проблема с идентификаторами;
-- `empty_title > 0` — часть новостей пришла без заголовков;
-- `empty_content_text > 0` — возможно, RSS содержит только title/summary;
-- `empty_topic_label > 0` — проблема на этапе классификации или fallback-логики.
+- `bad_article_id > 0` — проблема с идентификаторами;<!-- cb-k-104 -->
+- `empty_title > 0` — часть новостей пришла без заголовков;<!-- cb-k-105 -->
+- `empty_content_text > 0` — возможно, RSS содержит только title/summary;<!-- cb-k-106 -->
+- `empty_topic_label > 0` — проблема на этапе классификации или fallback-логики.<!-- cb-k-107 -->
 
----
+---<!-- cb-k-108 -->
 
-## 15. Shiny dashboard
+## 15. Shiny dashboard<!-- cb-k-109 -->
 
-Запуск полного стека:
+Запуск полного стека:<!-- cb-k-110 -->
 
-```bash
-docker compose up -d --build
-```
+```bash<!-- cb-k-111 -->
+docker compose up -d --build<!-- cb-k-112 -->
+```<!-- cb-k-113 -->
 
-Открыть dashboard:
+Открыть dashboard:<!-- cb-k-114 -->
 
-```text
-http://localhost:3838/ttrss
-```
+```text<!-- cb-k-115 -->
+http://localhost:3838/ttrss<!-- cb-k-116 -->
+```<!-- cb-k-117 -->
 
-Важное ограничение: Shiny может показывать локальный cache/RDS-файл, даже если ClickHouse пуст. Поэтому состояние пайплайна нужно валидировать через ClickHouse:
+Важное ограничение: Shiny может показывать локальный cache/RDS-файл, даже если ClickHouse пуст. Поэтому состояние пайплайна нужно валидировать через ClickHouse:<!-- cb-k-118 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT count() FROM articles FINAL"
-```
+```bash<!-- cb-k-119 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT count() FROM articles FINAL"<!-- cb-k-120 -->
+```<!-- cb-k-121 -->
 
-Если dashboard показывает данные, а `articles` пустой — это не доказательство успешной записи в ClickHouse.
+Если dashboard показывает данные, а `articles` пустой — это не доказательство успешной записи в ClickHouse.<!-- cb-k-122 -->
 
----
+---<!-- cb-k-123 -->
 
-## 16. MCP-интеграция
+## 16. MCP-интеграция<!-- cb-k-124 -->
 
-MCP endpoint:
+MCP endpoint:<!-- cb-k-125 -->
 
-```text
-http://localhost:8000/mcp
-```
+```text<!-- cb-k-126 -->
+http://localhost:8000/mcp<!-- cb-k-127 -->
+```<!-- cb-k-128 -->
 
-Healthcheck:
+Healthcheck:<!-- cb-k-129 -->
 
-```bash
-curl http://localhost:8000/health
-```
+```bash<!-- cb-k-130 -->
+curl http://localhost:8000/health<!-- cb-k-131 -->
+```<!-- cb-k-132 -->
 
-Список инструментов:
+Список инструментов:<!-- cb-k-133 -->
 
-```bash
-curl -X POST http://localhost:8000/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-```
+```bash<!-- cb-k-134 -->
+curl -X POST http://localhost:8000/mcp \<!-- cb-k-135 -->
+  -H "Content-Type: application/json" \<!-- cb-k-136 -->
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'<!-- cb-k-137 -->
+```<!-- cb-k-138 -->
 
-Роль MCP:
+Роль MCP:<!-- cb-k-139 -->
 
-- MCP не выполняет ML-инференс;
-- MCP не классифицирует новые статьи;
-- MCP читает уже подготовленные данные и агрегаты из ClickHouse;
-- MCP нужен как интерфейс для AI-агентов и внешних клиентов.
+- MCP не выполняет ML-инференс;<!-- cb-k-140 -->
+- MCP не классифицирует новые статьи;<!-- cb-k-141 -->
+- MCP читает уже подготовленные данные и агрегаты из ClickHouse;<!-- cb-k-142 -->
+- MCP нужен как интерфейс для AI-агентов и внешних клиентов.<!-- cb-k-143 -->
 
-Доступные инструменты:
+Доступные инструменты:<!-- cb-k-144 -->
 
-| Tool | Назначение |
-|---|---|
-| `search_articles` | поиск статей |
-| `get_topic_summary` | агрегаты по темам |
-| `get_recent_articles` | последние статьи |
-| `get_feed_stats` | статистика по источникам |
+| Tool | Назначение |<!-- cb-k-145 -->
+|---|---|<!-- cb-k-146 -->
+| `search_articles` | поиск статей |<!-- cb-k-147 -->
+| `get_topic_summary` | агрегаты по темам |<!-- cb-k-148 -->
+| `get_recent_articles` | последние статьи |<!-- cb-k-149 -->
+| `get_feed_stats` | статистика по источникам |<!-- cb-k-150 -->
 
-Доступные ресурсы:
+Доступные ресурсы:<!-- cb-k-151 -->
 
-```text
-ttrss://articles
-ttrss://topics
-```
+```text<!-- cb-k-152 -->
+ttrss://articles<!-- cb-k-153 -->
+ttrss://topics<!-- cb-k-154 -->
+```<!-- cb-k-155 -->
 
-### 16.1. Проверка последних статей через MCP
+### 16.1. Проверка последних статей через MCP<!-- cb-k-156 -->
 
-Bash/cURL:
+Bash/cURL:<!-- cb-k-157 -->
 
-```bash
-curl -X POST http://localhost:8000/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_recent_articles","arguments":{"limit":5}}}'
-```
+```bash<!-- cb-k-158 -->
+curl -X POST http://localhost:8000/mcp \<!-- cb-k-159 -->
+  -H "Content-Type: application/json" \<!-- cb-k-160 -->
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_recent_articles","arguments":{"limit":5}}}'<!-- cb-k-161 -->
+```<!-- cb-k-162 -->
 
-PowerShell:
+PowerShell:<!-- cb-k-163 -->
 
-```powershell
-$r = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:8000/mcp" `
-  -ContentType "application/json" `
-  -Body '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_recent_articles","arguments":{"limit":5}}}'
+```powershell<!-- cb-k-164 -->
+$r = Invoke-RestMethod -Method POST `<!-- cb-k-165 -->
+  -Uri "http://localhost:8000/mcp" `<!-- cb-k-166 -->
+  -ContentType "application/json" `<!-- cb-k-167 -->
+  -Body '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_recent_articles","arguments":{"limit":5}}}'<!-- cb-k-168 -->
 
-$r.result.content[0].text | ConvertFrom-Json | Format-Table
-```
+$r.result.content[0].text | ConvertFrom-Json | Format-Table<!-- cb-k-169 -->
+```<!-- cb-k-170 -->
 
-### 16.2. Проверка источников через MCP
+### 16.2. Проверка источников через MCP<!-- cb-k-171 -->
 
-```powershell
-$r = Invoke-RestMethod -Method POST `
-  -Uri "http://localhost:8000/mcp" `
-  -ContentType "application/json" `
-  -Body '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_feed_stats","arguments":{}}}'
+```powershell<!-- cb-k-172 -->
+$r = Invoke-RestMethod -Method POST `<!-- cb-k-173 -->
+  -Uri "http://localhost:8000/mcp" `<!-- cb-k-174 -->
+  -ContentType "application/json" `<!-- cb-k-175 -->
+  -Body '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_feed_stats","arguments":{}}}'<!-- cb-k-176 -->
 
-$r.result.content[0].text | ConvertFrom-Json | Format-Table
-```
+$r.result.content[0].text | ConvertFrom-Json | Format-Table<!-- cb-k-177 -->
+```<!-- cb-k-178 -->
 
-PowerShell может отображать вложенные поля как `System.Object[]`. Для раскрытия JSON используйте:
+PowerShell может отображать вложенные поля как `System.Object[]`. Для раскрытия JSON используйте:<!-- cb-k-179 -->
 
-```powershell
-$r | ConvertTo-Json -Depth 20
-```
+```powershell<!-- cb-k-180 -->
+$r | ConvertTo-Json -Depth 20<!-- cb-k-181 -->
+```<!-- cb-k-182 -->
 
----
+---<!-- cb-k-183 -->
 
-## 17. Manual one-time run
+## 17. Manual one-time run<!-- cb-k-184 -->
 
-Ручной запуск не является основным production-flow. Он полезен для отладки.
+Ручной запуск не является основным production-flow. Он полезен для отладки.<!-- cb-k-185 -->
 
-Локально:
+Локально:<!-- cb-k-186 -->
 
-```r
-source("data-raw/fetch_news.R")
-```
+```r<!-- cb-k-187 -->
+source("data-raw/fetch_news.R")<!-- cb-k-188 -->
+```<!-- cb-k-189 -->
 
-Через Rscript:
+Через Rscript:<!-- cb-k-190 -->
 
-```bash
-Rscript data-raw/fetch_news.R
-```
+```bash<!-- cb-k-191 -->
+Rscript data-raw/fetch_news.R<!-- cb-k-192 -->
+```<!-- cb-k-193 -->
 
-Перед ручным запуском проверьте переменные окружения. Для локального запуска чаще нужен `CH_HOST=localhost`, а не `CH_HOST=clickhouse`.
+Перед ручным запуском проверьте переменные окружения. Для локального запуска чаще нужен `CH_HOST=localhost`, а не `CH_HOST=clickhouse`.<!-- cb-k-194 -->
 
----
+---<!-- cb-k-195 -->
 
-## 18. Reset and re-validate
+## 18. Reset and re-validate<!-- cb-k-196 -->
 
-Используйте этот сценарий, когда нужно проверить восстановление с нуля после удаления ClickHouse volume.
+Используйте этот сценарий, когда нужно проверить восстановление с нуля после удаления ClickHouse volume.<!-- cb-k-197 -->
 
-```bash
+```bash<!-- cb-k-198 -->
 # Остановить все сервисы и удалить volumes
 
-docker compose down -v --remove-orphans
+docker compose down -v --remove-orphans<!-- cb-k-199 -->
 
-# Запустить scheduler заново
+# Запустить scheduler заново<!-- cb-k-200 -->
 
-docker compose up -d --build scheduler
-```
+docker compose up -d --build scheduler<!-- cb-k-201 -->
+```<!-- cb-k-202 -->
 
-После этого повторить проверки:
+После этого повторить проверки:<!-- cb-k-203 -->
 
-```bash
-docker logs -f ttrss-scheduler
-```
+```bash<!-- cb-k-204 -->
+docker logs -f ttrss-scheduler<!-- cb-k-205 -->
+```<!-- cb-k-206 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "SHOW TABLES"
-```
+```bash<!-- cb-k-207 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "SHOW TABLES"<!-- cb-k-208 -->
+```<!-- cb-k-209 -->
 
-```bash
-docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT count() FROM articles FINAL"
-```
+```bash<!-- cb-k-210 -->
+docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT count() FROM articles FINAL"<!-- cb-k-211 -->
+```<!-- cb-k-212 -->
 
 Важно: `docker compose down -v` сбрасывает все volumes. Если нужно сбросить только analytics и сохранить данные TT-RSS, используйте `docker compose down -v clickhouse shiny scheduler mcp`.
 
----
+---<!-- cb-k-213 -->
 
-## 19. ML-этап
+## 19. ML-этап<!-- cb-k-214 -->
 
-Поддерживаемые методы классификации:
+Поддерживаемые методы классификации:<!-- cb-k-215 -->
 
-| Method | Описание |
-|---|---|
-| `lda` | тематическое моделирование через `topicmodels::LDA` |
-| `kmeans` | baseline-кластеризация по TF-IDF |
-| `yandex_llm` | closed-set классификация через Yandex GPT |
+| Method | Описание |<!-- cb-k-216 -->
+|---|---|<!-- cb-k-217 -->
+| `lda` | тематическое моделирование через `topicmodels::LDA` |<!-- cb-k-218 -->
+| `kmeans` | baseline-кластеризация по TF-IDF |<!-- cb-k-219 -->
+| `yandex_llm` | closed-set классификация через Yandex GPT |<!-- cb-k-220 -->
 | `llm` | closed-set классификация через выбранного LLM-провайдера (`ellmer`) |
 
 `yandex_llm` и `llm` удобны, если нужны понятные названия тем из фиксированной таксономии.
 
 `lda` и `kmeans` полезны как baseline и как способ быстро проверить структуру корпуса без внешних API.
 
-### 19.1. Ненадзорные метрики качества
+### 19.1. Ненадзорные метрики качества<!-- cb-k-221 -->
 
 `evaluate_topic_quality()` возвращает:
 
@@ -893,7 +893,7 @@ docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT co
 - `dominant_topic_share`;
 - `topic_balance_entropy`;
 - `topic_distinctiveness`;
-- `per_topic` распределение.
+- `per_topic` распределение.<!-- cb-k-222 -->
 
 Пример:
 
@@ -902,85 +902,85 @@ df <- classify_news(df, method = "lda", compute_quality = TRUE)
 attr(df, "topic_quality")
 ```
 
-### 19.2. Бенчмарк методов
+### 19.2. Бенчмарк методов<!-- cb-k-223 -->
 
 ```r
 source("data-raw/compare_methods.R")
 ```
 
-Артефакты сравнения:
+Артефакты сравнения:<!-- cb-k-224 -->
 
-```text
-data/method_comparison.csv
-data/method_comparison.rds
-```
+```text<!-- cb-k-225 -->
+data/method_comparison.csv<!-- cb-k-226 -->
+data/method_comparison.rds<!-- cb-k-227 -->
+```<!-- cb-k-228 -->
 
-### 19.3. Optional mini ground-truth
+### 19.3. Optional mini ground-truth<!-- cb-k-229 -->
 
-`mini_ground_truth_workflow.R` остается опциональным validation workflow. Это не основной публичный контур оценки модели.
+`mini_ground_truth_workflow.R` остается опциональным validation workflow. Это не основной публичный контур оценки модели.<!-- cb-k-230 -->
 
----
+---<!-- cb-k-231 -->
 
-## 20. Артефакты проекта
+## 20. Артефакты проекта<!-- cb-k-232 -->
 
-Основные runtime-артефакты:
+Основные runtime-артефакты:<!-- cb-k-233 -->
 
-| Артефакт | Где находится | Когда появляется |
-|---|---|---|
-| `articles` | ClickHouse, база `ttrss` | после успешного `fetch_news.R` |
-| `feeds` | ClickHouse, база `ttrss` | после инициализации схемы / записи данных |
-| `topic_summary` | ClickHouse, база `ttrss` | после агрегации тем |
-| `data/yandex_llm_cache.rds` | filesystem | после классификации через `yandex_llm` |
-| `data/method_comparison.csv` | filesystem | после `compare_methods.R` |
-| `data/method_comparison.rds` | filesystem | после `compare_methods.R` |
-| `data/news_raw.rds` | filesystem / Shiny data dir | legacy/local cache для dashboard |
+| Артефакт | Где находится | Когда появляется |<!-- cb-k-234 -->
+|---|---|---|<!-- cb-k-235 -->
+| `articles` | ClickHouse, база `ttrss` | после успешного `fetch_news.R` |<!-- cb-k-236 -->
+| `feeds` | ClickHouse, база `ttrss` | после инициализации схемы / записи данных |<!-- cb-k-237 -->
+| `topic_summary` | ClickHouse, база `ttrss` | после агрегации тем |<!-- cb-k-238 -->
+| `data/yandex_llm_cache.rds` | filesystem | после классификации через `yandex_llm` |<!-- cb-k-239 -->
+| `data/method_comparison.csv` | filesystem | после `compare_methods.R` |<!-- cb-k-240 -->
+| `data/method_comparison.rds` | filesystem | после `compare_methods.R` |<!-- cb-k-241 -->
+| `data/news_raw.rds` | filesystem / Shiny data dir | legacy/local cache для dashboard |<!-- cb-k-242 -->
 
-Операционные endpoints:
+Операционные endpoints:<!-- cb-k-243 -->
 
-| Endpoint | Назначение |
-|---|---|
-| `http://localhost:8080` | TT-RSS UI |
-| `http://localhost:8080/api/` | TT-RSS JSON API |
-| `http://localhost:3838/ttrss` | Shiny dashboard |
-| `http://localhost:8000/mcp` | MCP JSON-RPC endpoint |
-| `http://localhost:8000/health` | MCP healthcheck |
-| `http://localhost:8123` | ClickHouse HTTP |
+| Endpoint | Назначение |<!-- cb-k-244 -->
+|---|---|<!-- cb-k-245 -->
+| `http://localhost:8080` | TT-RSS UI |<!-- cb-k-246 -->
+| `http://localhost:8080/api/` | TT-RSS JSON API |<!-- cb-k-247 -->
+| `http://localhost:3838/ttrss` | Shiny dashboard |<!-- cb-k-248 -->
+| `http://localhost:8000/mcp` | MCP JSON-RPC endpoint |<!-- cb-k-249 -->
+| `http://localhost:8000/health` | MCP healthcheck |<!-- cb-k-250 -->
+| `http://localhost:8123` | ClickHouse HTTP |<!-- cb-k-251 -->
 
----
+---<!-- cb-k-252 -->
 
-## 21. Типовые проблемы и диагностика
+## 21. Типовые проблемы и диагностика<!-- cb-k-253 -->
 
-### 21.1. `API_DISABLED`
+### 21.1. `API_DISABLED`<!-- cb-k-254 -->
 
-Причина: в TT-RSS не включен API-доступ.
+Причина: в TT-RSS не включен API-доступ.<!-- cb-k-255 -->
 
-Что сделать:
+Что сделать:<!-- cb-k-256 -->
 
-1. Открыть `http://localhost:8080`.
-2. Войти под admin-пользователем.
-3. Включить `API access` / `external API` в настройках.
-4. Повторить запуск scheduler.
+1. Открыть `http://localhost:8080`.<!-- cb-k-257 -->
+2. Войти под admin-пользователем.<!-- cb-k-258 -->
+3. Включить `API access` / `external API` в настройках.<!-- cb-k-259 -->
+4. Повторить запуск scheduler.<!-- cb-k-260 -->
 
-Проверка:
+Проверка:<!-- cb-k-261 -->
 
-```bash
-curl -X POST http://localhost:8080/api/ \
-  -H "Content-Type: application/json" \
-  -d '{"op":"login","user":"admin","password":"password"}'
-```
+```bash<!-- cb-k-262 -->
+curl -X POST http://localhost:8080/api/ \<!-- cb-k-263 -->
+  -H "Content-Type: application/json" \<!-- cb-k-264 -->
+  -d '{"op":"login","user":"admin","password":"password"}'<!-- cb-k-265 -->
+```<!-- cb-k-266 -->
 
----
+---<!-- cb-k-267 -->
 
-### 21.2. `articles` table missing
+### 21.2. `articles` table missing<!-- cb-k-268 -->
 
-Возможные причины:
+Возможные причины:<!-- cb-k-269 -->
 
-- scheduler не стартовал;
-- ClickHouse не готов;
-- `fetch_news.R` упал до `ch_init_schema`;
-- неверные переменные окружения ClickHouse.
+- scheduler не стартовал;<!-- cb-k-270 -->
+- ClickHouse не готов;<!-- cb-k-271 -->
+- `fetch_news.R` упал до `ch_init_schema`;<!-- cb-k-272 -->
+- неверные переменные окружения ClickHouse.<!-- cb-k-273 -->
 
-Проверки:
+Проверки:<!-- cb-k-274 -->
 
 ```bash
 docker compose ps
