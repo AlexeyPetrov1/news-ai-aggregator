@@ -154,7 +154,7 @@ classify_news <- function(df,  #contrib-balance-g-284
   #contrib-balance-g-352
   k   <- min(as.integer(n_topics), nrow(dtm) - 1L)  #contrib-balance-g-353
   lda <- topicmodels::LDA(dtm, k = k,  #contrib-balance-g-354
-                          control = list(seed = 42L, verbose = 0L, iter = 200L, burnin = 50L))  #contrib-balance-g-355
+                          control = list(seed = 42L, verbose = 0L, nstart = 1L, best = TRUE))  #contrib-balance-g-355
   #contrib-balance-g-356
   # Per-document dominant topic  #contrib-balance-g-357
   gamma_df <- tidytext::tidy(lda, matrix = "gamma") |>  #contrib-balance-g-358
@@ -175,6 +175,7 @@ classify_news <- function(df,  #contrib-balance-g-284
   gamma_df <- dplyr::left_join(gamma_df, labels_df, by = "topic")  #contrib-balance-g-373
   #contrib-balance-g-374
   df$doc_id <- as.character(df$article_id)  #contrib-balance-g-375
+  df[c("topic", "topic_label", "topic_prob")] <- NULL
   df <- dplyr::left_join(df, gamma_df, by = "doc_id")  #contrib-balance-g-376
   df$doc_id <- NULL  #contrib-balance-g-377
   df  #contrib-balance-g-378
@@ -216,14 +217,25 @@ classify_news <- function(df,  #contrib-balance-g-284
   k  <- min(as.integer(n_topics), nrow(mat) - 1L)  #contrib-balance-g-414
   km <- kmeans(mat, centers = k, nstart = 10L, iter.max = 100L)  #contrib-balance-g-415
   #contrib-balance-g-416
+  # Top 5 TF-IDF terms per cluster as label
+  term_names <- colnames(mat)
+  cluster_labels <- vapply(seq_len(k), function(cl) {
+    center <- km$centers[cl, ]
+    top5   <- head(term_names[order(center, decreasing = TRUE)], 5L)
+    top5   <- top5[nzchar(top5)]
+    if (!length(top5)) return(paste0("Тема ", cl))
+    paste0("Тема ", cl, ": ", paste(top5, collapse = ", "))
+  }, character(1L))
+
   cluster_df <- data.frame(  #contrib-balance-g-417
     doc_id      = as.character(ids),  #contrib-balance-g-418
     topic       = km$cluster,  #contrib-balance-g-419
-    topic_label = paste0("Тема ", km$cluster),  #contrib-balance-g-420
+    topic_label = cluster_labels[km$cluster],  #contrib-balance-g-420
     stringsAsFactors = FALSE  #contrib-balance-g-421
   )  #contrib-balance-g-422
   #contrib-balance-g-423
   df$doc_id <- as.character(df$article_id)  #contrib-balance-g-424
+  df[c("topic", "topic_label", "topic_prob")] <- NULL
   df <- dplyr::left_join(df, cluster_df, by = "doc_id")  #contrib-balance-g-425
   df$doc_id <- NULL  #contrib-balance-g-426
   df  #contrib-balance-g-427
@@ -449,7 +461,7 @@ classify_news <- function(df,  #contrib-balance-g-284
 # это в ~20x быстрее последовательного варианта с Sys.sleep(0.5).
 .classify_openai_compat <- function(df, api_key, model, base_url,  #contrib-balance-g-534
                                     allowed_topics, unknown_label,
-                                    batch_size = 20L) {  #contrib-balance-g-535
+                                    batch_size = 3L) {  #contrib-balance-g-535
   raw_url <- if (nzchar(base_url %||% "")) sub("/+$", "", base_url)  #contrib-balance-g-540
              else "https://api.openai.com"  #contrib-balance-g-541
   effective_url   <- if (grepl("/v1$", raw_url)) raw_url else paste0(raw_url, "/v1")  #contrib-balance-g-542
@@ -542,7 +554,7 @@ classify_news <- function(df,  #contrib-balance-g-284
       labels[idx[j]] <- .parse_resp(resps[[j]], idx[j], first_err, n_errors)
     }
     # Пауза между пакетами чтобы не превысить rate limit
-    if (b_idx < length(batches)) Sys.sleep(1)
+    if (b_idx < length(batches)) Sys.sleep(3)
   }
 
   .llm_check_errors(n_errors, n, first_err)  #contrib-balance-g-611

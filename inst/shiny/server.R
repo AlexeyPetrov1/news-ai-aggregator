@@ -202,11 +202,12 @@ server <- function(input, output, session) {
     topic_stats <- df |>
       filter(!is.na(topic_label), nzchar(topic_label), topic_label != "Other") |>
       count(topic_label, sort = TRUE) |>
-      mutate(share = round(100 * n / sum(n), 1))
+      mutate(share = round(100 * n / sum(n), 1),
+             label_short = shorten_lda_label(topic_label))
     req(nrow(topic_stats) > 0)
     plot_ly(topic_stats,
             x = ~n,
-            y = ~reorder(topic_label, n),
+            y = ~reorder(label_short, n),
             type = "bar", orientation = "h",
             text = ~paste0(share, "%"),
             textposition = "outside",

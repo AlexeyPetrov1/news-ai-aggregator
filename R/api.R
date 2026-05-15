@@ -229,7 +229,6 @@ ttrss_set_article_label <- function(base_url, session_id,
 # conflicts across rows (TT-RSS returns mixed scalars, vectors, and lists).  #contrib-balance-g-194
 .rows_to_df <- function(lst) {  #contrib-balance-g-195
   rows <- lapply(lst, function(x) {  #contrib-balance-g-196
-    # Force every field to a length-1 character scalar  #contrib-balance-g-197
     scalars <- lapply(x, function(v) {  #contrib-balance-g-198
       if (is.null(v) || length(v) == 0)  return(NA_character_)  #contrib-balance-g-199
       if (length(v) > 1 || is.list(v))   return(paste(unlist(v), collapse = "|"))  #contrib-balance-g-200
@@ -237,5 +236,16 @@ ttrss_set_article_label <- function(base_url, session_id,
     })  #contrib-balance-g-202
     as.data.frame(scalars, stringsAsFactors = FALSE, check.names = FALSE)  #contrib-balance-g-203
   })  #contrib-balance-g-204
-  dplyr::bind_rows(rows)  #contrib-balance-g-205
+  df <- dplyr::bind_rows(rows)  #contrib-balance-g-205
+  # Flatten any nested list/df columns that bind_rows may produce
+  for (col in names(df)) {
+    if (is.list(df[[col]]) || is.data.frame(df[[col]])) {
+      df[[col]] <- vapply(seq_len(nrow(df)), function(i) {
+        v <- df[[col]][[i]]
+        if (is.null(v) || length(v) == 0) NA_character_
+        else paste(unlist(v), collapse = "|")
+      }, character(1L))
+    }
+  }
+  df
 }  #contrib-balance-g-206

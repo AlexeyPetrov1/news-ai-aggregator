@@ -85,6 +85,17 @@ fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967
   }  #contrib-balance-k-1019
   #contrib-balance-k-1020
   raw_df <- dplyr::bind_rows(collected)  #contrib-balance-k-1021
+
+  # Flatten any nested list/df columns that bind_rows may have created
+  for (col in names(raw_df)) {
+    if (is.data.frame(raw_df[[col]]) || is.list(raw_df[[col]])) {
+      raw_df[[col]] <- vapply(raw_df[[col]], function(v) {
+        if (is.null(v) || length(v) == 0) NA_character_
+        else paste(unlist(v), collapse = "|")
+      }, character(1L))
+    }
+  }
+
   cli::cli_inform("Fetched {nrow(raw_df)} articles. Normalising…")  #contrib-balance-k-1022
 
   # Patch feed_title from lookup: always use real feed title from TT-RSS
