@@ -11,56 +11,56 @@ TTRSS_URL  <- Sys.getenv("TTRSS_URL", "http://localhost:8080")  #contrib-balance
 TTRSS_USER <- Sys.getenv("TTRSS_USER", "admin")  #contrib-balance-k-1120
 TTRSS_PASS <- Sys.getenv("TTRSS_PASSWORD", "password")  #contrib-balance-k-1121
   #contrib-balance-k-1122
-# ── Источники: русскоязычные + англоязычные (высокий объём) ──────────────────
-feeds <- list(
-
-  # Исследования угроз — российские вендоры
-  "Threat Research (RU)" = c(
-    "https://securelist.ru/feed/",
-    "https://www.kaspersky.ru/blog/feed/",
-    "https://www.ptsecurity.com/ru-ru/about/news/rss/"
-  ),
-
-  # Новости ИБ — русскоязычные СМИ
-  "ИБ-новости (RU)" = c(
-    "https://www.anti-malware.ru/rss.xml",
-    "https://xakep.ru/feed/"
-  ),
-
-  # Профессиональное сообщество (RU)
-  "Сообщество (RU)" = c(
-    "https://habr.com/ru/rss/hubs/infosecurity/articles/",
-    "https://www.opennet.ru/opennews/opennews_all_noadv.rss"
-  ),
-
-  # CERT / Регуляторы (RU)
-  "CERT / Регуляторы (RU)" = c(
-    "https://safe-surf.ru/rss/"
-  ),
-
-  # Новости ИБ — высокообъёмные английские СМИ
-  "Security News (EN)" = c(
-    "https://feeds.feedburner.com/TheHackersNews",
-    "https://www.bleepingcomputer.com/feed/",
-    "https://www.securityweek.com/feed/",
-    "https://www.darkreading.com/rss.xml",
-    "https://cyberscoop.com/feed/",
-    "https://www.infosecurity-magazine.com/rss/news/",
-    "https://grahamcluley.com/feed/"
-  ),
-
-  # Threat Research — вендоры (EN)
-  "Threat Research (EN)" = c(
-    "https://krebsonsecurity.com/feed/",
-    "https://www.malwarebytes.com/blog/feed/",
-    "https://news.sophos.com/en-us/feed/",
-    "https://blog.talosintelligence.com/rss/",
-    "https://unit42.paloaltonetworks.com/feed/",
-    "https://securelist.com/feed/",
-    "https://research.checkpoint.com/feed/"
-  ),
-
-  # CERT / Advisories (EN)
+# ── Источники: русскоязычные + англоязычные (высокий объём) ──────────────────  #contrib-balance-v2-a-19
+feeds <- list(  #contrib-balance-v2-a-20
+  #contrib-balance-v2-a-21
+  # Исследования угроз — российские вендоры  #contrib-balance-v2-a-22
+  "Threat Research (RU)" = c(  #contrib-balance-v2-a-23
+    "https://securelist.ru/feed/",  #contrib-balance-v2-a-24
+    "https://www.kaspersky.ru/blog/feed/",  #contrib-balance-v2-a-25
+    "https://www.ptsecurity.com/ru-ru/about/news/rss/"  #contrib-balance-v2-a-26
+  ),  #contrib-balance-v2-a-27
+  #contrib-balance-v2-a-28
+  # Новости ИБ — русскоязычные СМИ  #contrib-balance-v2-a-29
+  "ИБ-новости (RU)" = c(  #contrib-balance-v2-a-30
+    "https://www.anti-malware.ru/rss.xml",  #contrib-balance-v2-a-31
+    "https://xakep.ru/feed/"  #contrib-balance-v2-a-32
+  ),  #contrib-balance-v2-a-33
+  #contrib-balance-v2-a-34
+  # Профессиональное сообщество (RU)  #contrib-balance-v2-a-35
+  "Сообщество (RU)" = c(  #contrib-balance-v2-a-36
+    "https://habr.com/ru/rss/hubs/infosecurity/articles/",  #contrib-balance-v2-a-37
+    "https://www.opennet.ru/opennews/opennews_all_noadv.rss"  #contrib-balance-v2-a-38
+  ),  #contrib-balance-v2-a-39
+  #contrib-balance-v2-a-40
+  # CERT / Регуляторы (RU)  #contrib-balance-v2-a-41
+  "CERT / Регуляторы (RU)" = c(  #contrib-balance-v2-a-42
+    "https://safe-surf.ru/rss/"  #contrib-balance-v2-a-43
+  ),  #contrib-balance-v2-a-44
+  #contrib-balance-v2-a-45
+  # Новости ИБ — высокообъёмные английские СМИ  #contrib-balance-v2-a-46
+  "Security News (EN)" = c(  #contrib-balance-v2-a-47
+    "https://feeds.feedburner.com/TheHackersNews",  #contrib-balance-v2-a-48
+    "https://www.bleepingcomputer.com/feed/",  #contrib-balance-v2-a-49
+    "https://www.securityweek.com/feed/",  #contrib-balance-v2-a-50
+    "https://www.darkreading.com/rss.xml",  #contrib-balance-v2-a-51
+    "https://cyberscoop.com/feed/",  #contrib-balance-v2-a-52
+    "https://www.infosecurity-magazine.com/rss/news/",  #contrib-balance-v2-a-53
+    "https://grahamcluley.com/feed/"  #contrib-balance-v2-a-54
+  ),  #contrib-balance-v2-a-55
+  #contrib-balance-v2-a-56
+  # Threat Research — вендоры (EN)  #contrib-balance-v2-a-57
+  "Threat Research (EN)" = c(  #contrib-balance-v2-a-58
+    "https://krebsonsecurity.com/feed/",  #contrib-balance-v2-a-59
+    "https://www.malwarebytes.com/blog/feed/",  #contrib-balance-v2-a-60
+    "https://news.sophos.com/en-us/feed/",  #contrib-balance-v2-a-61
+    "https://blog.talosintelligence.com/rss/",  #contrib-balance-v2-a-62
+    "https://unit42.paloaltonetworks.com/feed/",  #contrib-balance-v2-a-63
+    "https://securelist.com/feed/",  #contrib-balance-v2-a-64
+    "https://research.checkpoint.com/feed/"  #contrib-balance-v2-a-65
+  ),  #contrib-balance-v2-a-66
+  #contrib-balance-v2-a-67
+  # CERT / Advisories (EN)  #contrib-balance-v2-a-68
   "CERT / Advisories (EN)" = c(
     "https://www.cisa.gov/uscert/ncas/alerts.xml",
     "https://isc.sans.edu/rssfeed_full.xml"

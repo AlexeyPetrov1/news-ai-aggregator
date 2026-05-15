@@ -85,25 +85,25 @@ fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967
   }  #contrib-balance-k-1019
   #contrib-balance-k-1020
   raw_df <- dplyr::bind_rows(collected)  #contrib-balance-k-1021
-
-  # Flatten any nested list/df columns that bind_rows may have created
-  for (col in names(raw_df)) {
-    if (is.data.frame(raw_df[[col]]) || is.list(raw_df[[col]])) {
-      raw_df[[col]] <- vapply(raw_df[[col]], function(v) {
-        if (is.null(v) || length(v) == 0) NA_character_
-        else paste(unlist(v), collapse = "|")
-      }, character(1L))
-    }
-  }
-
+  #contrib-balance-v2-a-1
+  # Flatten any nested list/df columns that bind_rows may have created  #contrib-balance-v2-a-2
+  for (col in names(raw_df)) {  #contrib-balance-v2-a-3
+    if (is.data.frame(raw_df[[col]]) || is.list(raw_df[[col]])) {  #contrib-balance-v2-a-4
+      raw_df[[col]] <- vapply(raw_df[[col]], function(v) {  #contrib-balance-v2-a-5
+        if (is.null(v) || length(v) == 0) NA_character_  #contrib-balance-v2-a-6
+        else paste(unlist(v), collapse = "|")  #contrib-balance-v2-a-7
+      }, character(1L))  #contrib-balance-v2-a-8
+    }  #contrib-balance-v2-a-9
+  }  #contrib-balance-v2-a-10
+  #contrib-balance-v2-a-11
   cli::cli_inform("Fetched {nrow(raw_df)} articles. Normalising…")  #contrib-balance-k-1022
-
-  # Patch feed_title from lookup: always use real feed title from TT-RSS
-  if (length(feed_lookup) > 0 && "feed_id" %in% names(raw_df)) {
-    looked_up <- unname(feed_lookup[as.character(raw_df$feed_id)])
-    replace   <- !is.na(looked_up) & nzchar(looked_up) & looked_up != "[Unknown]"
-    raw_df$feed_title[replace] <- looked_up[replace]
-  }
+  #contrib-balance-v2-a-12
+  # Patch feed_title from lookup: always use real feed title from TT-RSS  #contrib-balance-v2-a-13
+  if (length(feed_lookup) > 0 && "feed_id" %in% names(raw_df)) {  #contrib-balance-v2-a-14
+    looked_up <- unname(feed_lookup[as.character(raw_df$feed_id)])  #contrib-balance-v2-a-15
+    replace   <- !is.na(looked_up) & nzchar(looked_up) & looked_up != "[Unknown]"  #contrib-balance-v2-a-16
+    raw_df$feed_title[replace] <- looked_up[replace]  #contrib-balance-v2-a-17
+  }  #contrib-balance-v2-a-18
   #contrib-balance-k-1023
   .normalize_articles(raw_df)  #contrib-balance-k-1024
 }  #contrib-balance-k-1025
