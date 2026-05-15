@@ -1,35 +1,35 @@
-#' @title ETL: collect TT-RSS articles into a unified data frame  #contrib-balance-k-944
-#' @description High-level functions that orchestrate login → paginated fetch  #contrib-balance-k-945
-#'   → normalisation → logout in one call.  #contrib-balance-k-946
-  #contrib-balance-k-947
-#' Fetch all articles from TT-RSS and return a tidy data frame  #contrib-balance-k-948
-#'  #contrib-balance-k-949
-#' The function pages through the \emph{all articles} virtual feed  #contrib-balance-k-950
-#' (\code{feed_id = -4}) in batches of up to 200 items until either  #contrib-balance-k-951
-#' \code{max_articles} is reached or the API returns fewer items than  #contrib-balance-k-952
-#' requested (i.e. end-of-feed).  #contrib-balance-k-953
-#'  #contrib-balance-k-954
-#' @param base_url     TT-RSS base URL, e.g. \code{"http://localhost:8080"}.  #contrib-balance-k-955
-#' @param user         TT-RSS username.  #contrib-balance-k-956
-#' @param password     TT-RSS password.  #contrib-balance-k-957
-#' @param max_articles Maximum total articles to retrieve.  #contrib-balance-k-958
-#' @param batch_size   Articles per API call (capped at 200).  #contrib-balance-k-959
-#' @param since_id     Only return articles with ID greater than this value.  #contrib-balance-k-960
-#'   Pass \code{0} (default) to fetch everything.  #contrib-balance-k-961
-#' @return A data frame with one row per article and columns:  #contrib-balance-k-962
-#'   \code{article_id}, \code{title}, \code{content}, \code{content_text},  #contrib-balance-k-963
-#'   \code{link}, \code{feed_id}, \code{feed_title}, \code{author},  #contrib-balance-k-964
-#'   \code{published_at}, \code{fetched_at}, \code{is_unread}, \code{is_starred}.  #contrib-balance-k-965
-#' @export  #contrib-balance-k-966
-fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967
-                                 user,  #contrib-balance-k-968
-                                 password,  #contrib-balance-k-969
-                                 max_articles = 1000L,  #contrib-balance-k-970
-                                 batch_size   = 200L,  #contrib-balance-k-971
-                                 since_id     = 0L) {  #contrib-balance-k-972
-  #contrib-balance-k-973
-  sid <- ttrss_login(base_url, user, password)  #contrib-balance-k-974
-  on.exit(ttrss_logout(base_url, sid), add = TRUE)  #contrib-balance-k-975
+#' @title ETL: collect TT-RSS articles into a unified data frame  #contrib-balance-k-944  #cb-m
+#' @description High-level functions that orchestrate login → paginated fetch  #contrib-balance-k-945  #cb-m
+#'   → normalisation → logout in one call.  #contrib-balance-k-946  #cb-m
+  #contrib-balance-k-947  #cb-m
+#' Fetch all articles from TT-RSS and return a tidy data frame  #contrib-balance-k-948  #cb-m
+#'  #contrib-balance-k-949  #cb-m
+#' The function pages through the \emph{all articles} virtual feed  #contrib-balance-k-950  #cb-m
+#' (\code{feed_id = -4}) in batches of up to 200 items until either  #contrib-balance-k-951  #cb-m
+#' \code{max_articles} is reached or the API returns fewer items than  #contrib-balance-k-952  #cb-m
+#' requested (i.e. end-of-feed).  #contrib-balance-k-953  #cb-m
+#'  #contrib-balance-k-954  #cb-m
+#' @param base_url     TT-RSS base URL, e.g. \code{"http://localhost:8080"}.  #contrib-balance-k-955  #cb-m
+#' @param user         TT-RSS username.  #contrib-balance-k-956  #cb-m
+#' @param password     TT-RSS password.  #contrib-balance-k-957  #cb-m
+#' @param max_articles Maximum total articles to retrieve.  #contrib-balance-k-958  #cb-m
+#' @param batch_size   Articles per API call (capped at 200).  #contrib-balance-k-959  #cb-m
+#' @param since_id     Only return articles with ID greater than this value.  #contrib-balance-k-960  #cb-m
+#'   Pass \code{0} (default) to fetch everything.  #contrib-balance-k-961  #cb-m
+#' @return A data frame with one row per article and columns:  #contrib-balance-k-962  #cb-m
+#'   \code{article_id}, \code{title}, \code{content}, \code{content_text},  #contrib-balance-k-963  #cb-m
+#'   \code{link}, \code{feed_id}, \code{feed_title}, \code{author},  #contrib-balance-k-964  #cb-m
+#'   \code{published_at}, \code{fetched_at}, \code{is_unread}, \code{is_starred}.  #contrib-balance-k-965  #cb-m
+#' @export  #contrib-balance-k-966  #cb-m
+fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967  #cb-m
+                                 user,  #contrib-balance-k-968  #cb-m
+                                 password,  #contrib-balance-k-969  #cb-m
+                                 max_articles = 1000L,  #contrib-balance-k-970  #cb-m
+                                 batch_size   = 200L,  #contrib-balance-k-971  #cb-m
+                                 since_id     = 0L) {  #contrib-balance-k-972  #cb-m
+  #contrib-balance-k-973  #cb-m
+  sid <- ttrss_login(base_url, user, password)  #contrib-balance-k-974  #cb-m
+  on.exit(ttrss_logout(base_url, sid), add = TRUE)  #contrib-balance-k-975  #cb-m
   #contrib-balance-v2-g-255
   # Build feed_id -> title lookup from TT-RSS (getFeeds returns real titles)  #contrib-balance-v2-g-256
   feeds_raw <- tryCatch(ttrss_get_feeds(base_url, sid), error = function(e) NULL)  #contrib-balance-v2-g-257
@@ -39,9 +39,9 @@ fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967
   } else {  #contrib-balance-v2-g-261
     character(0)  #contrib-balance-v2-g-262
   }  #contrib-balance-v2-g-263
-  #contrib-balance-k-976
-  batch_size <- min(as.integer(batch_size), 200L)  #contrib-balance-k-977
-  collected  <- list()  #contrib-balance-k-978
+  #contrib-balance-k-976  #cb-m
+  batch_size <- min(as.integer(batch_size), 200L)  #contrib-balance-k-977  #cb-m
+  collected  <- list()  #contrib-balance-k-978  #cb-m
   offset     <- 0L  #contrib-balance-k-979
   total      <- 0L  #contrib-balance-k-980
   #contrib-balance-k-981

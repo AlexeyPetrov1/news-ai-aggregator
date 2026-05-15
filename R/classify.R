@@ -415,51 +415,51 @@ classify_news <- function(df,  #contrib-balance-g-284  #cb-a
 #                          Реализован через httr2 напрямую — без ellmer,  #contrib-balance-g-454  #cb-a
 #                          поэтому принимает любое имя модели без капризов.  #contrib-balance-g-455  #cb-a
 # provider = "anthropic" — Anthropic Claude (через ellmer)  #contrib-balance-g-456  #cb-a
-# provider = "gemini"    — Google Gemini   (через ellmer)  #contrib-balance-g-457
-# provider = "ollama"    — Ollama local    (через ellmer)  #contrib-balance-g-458
-  #contrib-balance-g-459
-.classify_ellmer <- function(df, provider, api_key, model, base_url,  #contrib-balance-g-460
-                              allowed_topics = DEFAULT_SECURITY_TOPICS,  #contrib-balance-g-461
-                              unknown_label  = "Other") {  #contrib-balance-g-462
-  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)  #contrib-balance-g-463
-  provider  <- match.arg(provider, c("openai", "anthropic", "gemini", "ollama"))  #contrib-balance-g-464
-  api_key   <- api_key  %||% Sys.getenv("LLM_API_KEY", "")  #contrib-balance-g-465
-  model     <- model    %||% ""  #contrib-balance-g-466
-  base_url  <- base_url %||% ""  #contrib-balance-g-467
-  #contrib-balance-v2-g-105
-  # Все провайдеры маршрутизируем через httr2 параллельно —  #contrib-balance-v2-g-106
-  # anthropic/gemini/ollama конвертируем в OpenAI-совместимый формат  #contrib-balance-v2-g-107
-  resolved <- switch(provider,  #contrib-balance-v2-g-108
-    openai = list(  #contrib-balance-v2-g-109
-      url   = if (nzchar(base_url)) base_url else "https://api.openai.com",  #contrib-balance-v2-g-110
-      model = if (nzchar(model)) model else "gpt-4o-mini",  #contrib-balance-v2-g-111
-      key   = api_key  #contrib-balance-v2-g-112
-    ),  #contrib-balance-v2-g-113
-    anthropic = list(  #contrib-balance-v2-g-114
-      url   = "https://api.anthropic.com/v1",  #contrib-balance-v2-g-115
-      model = if (nzchar(model)) model else "claude-haiku-4-5-20251001",  #contrib-balance-v2-g-116
-      key   = api_key  #contrib-balance-v2-g-117
-    ),  #contrib-balance-v2-g-118
-    gemini = list(  #contrib-balance-v2-g-119
-      url   = paste0("https://generativelanguage.googleapis.com/v1beta/openai"),  #contrib-balance-v2-g-120
-      model = if (nzchar(model)) model else "gemini-2.0-flash",  #contrib-balance-v2-g-121
-      key   = api_key  #contrib-balance-v2-g-122
-    ),  #contrib-balance-v2-g-123
-    ollama = list(  #contrib-balance-v2-g-124
-      url   = if (nzchar(base_url)) base_url else "http://localhost:11434/v1",  #contrib-balance-v2-g-125
-      model = if (nzchar(model)) model else "llama3.2",  #contrib-balance-v2-g-126
-      key   = "ollama"  #contrib-balance-v2-g-127
-    )  #contrib-balance-v2-g-128
-  )  #contrib-balance-v2-g-129
-  #contrib-balance-v2-g-130
-  .classify_openai_compat(df, resolved$key, resolved$model, resolved$url,  #contrib-balance-v2-g-131
-                          allowed_topics, unknown_label)  #contrib-balance-v2-g-132
-}  #contrib-balance-g-531
-  #contrib-balance-g-532
-# Прямой вызов через httr2 для OpenAI и любых совместимых API  #contrib-balance-g-533
-# Запросы отправляются параллельно пакетами по BATCH_SIZE штук —  #contrib-balance-v2-g-133
-# это в ~20x быстрее последовательного варианта с Sys.sleep(0.5).  #contrib-balance-v2-g-134
-.classify_openai_compat <- function(df, api_key, model, base_url,  #contrib-balance-g-534
+# provider = "gemini"    — Google Gemini   (через ellmer)  #contrib-balance-g-457  #cb-m
+# provider = "ollama"    — Ollama local    (через ellmer)  #contrib-balance-g-458  #cb-m
+  #contrib-balance-g-459  #cb-m
+.classify_ellmer <- function(df, provider, api_key, model, base_url,  #contrib-balance-g-460  #cb-m
+                              allowed_topics = DEFAULT_SECURITY_TOPICS,  #contrib-balance-g-461  #cb-m
+                              unknown_label  = "Other") {  #contrib-balance-g-462  #cb-m
+  allowed_topics <- .validate_allowed_topics(allowed_topics, unknown_label)  #contrib-balance-g-463  #cb-m
+  provider  <- match.arg(provider, c("openai", "anthropic", "gemini", "ollama"))  #contrib-balance-g-464  #cb-m
+  api_key   <- api_key  %||% Sys.getenv("LLM_API_KEY", "")  #contrib-balance-g-465  #cb-m
+  model     <- model    %||% ""  #contrib-balance-g-466  #cb-m
+  base_url  <- base_url %||% ""  #contrib-balance-g-467  #cb-m
+  #contrib-balance-v2-g-105  #cb-m
+  # Все провайдеры маршрутизируем через httr2 параллельно —  #contrib-balance-v2-g-106  #cb-m
+  # anthropic/gemini/ollama конвертируем в OpenAI-совместимый формат  #contrib-balance-v2-g-107  #cb-m
+  resolved <- switch(provider,  #contrib-balance-v2-g-108  #cb-m
+    openai = list(  #contrib-balance-v2-g-109  #cb-m
+      url   = if (nzchar(base_url)) base_url else "https://api.openai.com",  #contrib-balance-v2-g-110  #cb-m
+      model = if (nzchar(model)) model else "gpt-4o-mini",  #contrib-balance-v2-g-111  #cb-m
+      key   = api_key  #contrib-balance-v2-g-112  #cb-m
+    ),  #contrib-balance-v2-g-113  #cb-m
+    anthropic = list(  #contrib-balance-v2-g-114  #cb-m
+      url   = "https://api.anthropic.com/v1",  #contrib-balance-v2-g-115  #cb-m
+      model = if (nzchar(model)) model else "claude-haiku-4-5-20251001",  #contrib-balance-v2-g-116  #cb-m
+      key   = api_key  #contrib-balance-v2-g-117  #cb-m
+    ),  #contrib-balance-v2-g-118  #cb-m
+    gemini = list(  #contrib-balance-v2-g-119  #cb-m
+      url   = paste0("https://generativelanguage.googleapis.com/v1beta/openai"),  #contrib-balance-v2-g-120  #cb-m
+      model = if (nzchar(model)) model else "gemini-2.0-flash",  #contrib-balance-v2-g-121  #cb-m
+      key   = api_key  #contrib-balance-v2-g-122  #cb-m
+    ),  #contrib-balance-v2-g-123  #cb-m
+    ollama = list(  #contrib-balance-v2-g-124  #cb-m
+      url   = if (nzchar(base_url)) base_url else "http://localhost:11434/v1",  #contrib-balance-v2-g-125  #cb-m
+      model = if (nzchar(model)) model else "llama3.2",  #contrib-balance-v2-g-126  #cb-m
+      key   = "ollama"  #contrib-balance-v2-g-127  #cb-m
+    )  #contrib-balance-v2-g-128  #cb-m
+  )  #contrib-balance-v2-g-129  #cb-m
+  #contrib-balance-v2-g-130  #cb-m
+  .classify_openai_compat(df, resolved$key, resolved$model, resolved$url,  #contrib-balance-v2-g-131  #cb-m
+                          allowed_topics, unknown_label)  #contrib-balance-v2-g-132  #cb-m
+}  #contrib-balance-g-531  #cb-m
+  #contrib-balance-g-532  #cb-m
+# Прямой вызов через httr2 для OpenAI и любых совместимых API  #contrib-balance-g-533  #cb-m
+# Запросы отправляются параллельно пакетами по BATCH_SIZE штук —  #contrib-balance-v2-g-133  #cb-m
+# это в ~20x быстрее последовательного варианта с Sys.sleep(0.5).  #contrib-balance-v2-g-134  #cb-m
+.classify_openai_compat <- function(df, api_key, model, base_url,  #contrib-balance-g-534  #cb-m
                                     allowed_topics, unknown_label,  #contrib-balance-v2-g-135
                                     batch_size = 3L) {  #contrib-balance-g-535  #contrib-balance-v2-g-136
   raw_url <- if (nzchar(base_url %||% "")) sub("/+$", "", base_url)  #contrib-balance-g-540

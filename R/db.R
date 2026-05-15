@@ -165,73 +165,73 @@ ch_write_articles <- function(con, df) {  #contrib-balance-g-800
   if (!"fetched_at" %in% names(df)) {  #contrib-balance-g-871
     df$fetched_at <- Sys.time()  #contrib-balance-g-872
   }  #contrib-balance-g-873
-  df$fetched_at[is.na(df$fetched_at)] <- Sys.time()  #contrib-balance-k-874
-  df$fetched_at <- as.POSIXct(df$fetched_at, tz = "UTC")  #contrib-balance-k-875
-  #contrib-balance-k-876
-  table_cols <- c(  #contrib-balance-k-877
-    "article_id",  #contrib-balance-k-878
-    "title",  #contrib-balance-k-879
-    "content",  #contrib-balance-k-880
-    "content_text",  #contrib-balance-k-881
-    "link",  #contrib-balance-k-882
-    "feed_id",  #contrib-balance-k-883
-    "feed_title",  #contrib-balance-k-884
-    "author",  #contrib-balance-k-885
-    "published_at",  #contrib-balance-k-886
-    "fetched_at",  #contrib-balance-k-887
-    "is_unread",  #contrib-balance-k-888
-    "is_starred",  #contrib-balance-k-889
-    "topic",  #contrib-balance-k-890
-    "topic_label",  #contrib-balance-k-891
-    "topic_prob"  #contrib-balance-k-892
-  )  #contrib-balance-k-893
-  #contrib-balance-k-894
-  df <- df[, table_cols, drop = FALSE]  #contrib-balance-k-895
-  #contrib-balance-k-896
-  DBI::dbWriteTable(  #contrib-balance-k-897
-    con,  #contrib-balance-k-898
-    "articles",  #contrib-balance-k-899
-    df,  #contrib-balance-k-900
-    append = TRUE,  #contrib-balance-k-901
-    overwrite = FALSE,  #contrib-balance-k-902
-    row.names = FALSE  #contrib-balance-k-903
-  )  #contrib-balance-k-904
-  #contrib-balance-k-905
-  cli::cli_inform("Wrote {nrow(df)} articles to ClickHouse.")  #contrib-balance-k-906
-  invisible(df)  #contrib-balance-k-907
-}  #contrib-balance-k-908
-  #contrib-balance-k-909
-#' Read articles from ClickHouse  #contrib-balance-k-910
-#'  #contrib-balance-k-911
-#' @param con   DBI connection.  #contrib-balance-k-912
-#' @param where Optional SQL WHERE expression, e.g.  #contrib-balance-k-913
-#'   \code{"topic_label = 'Политика'"}.  #contrib-balance-k-914
-#' @param limit Maximum rows.  #contrib-balance-k-915
-#' @return Data frame.  #contrib-balance-k-916
-#' @export  #contrib-balance-k-917
-ch_read_articles <- function(con, where = NULL, limit = 10000L) {  #contrib-balance-k-918
-  sql <- "SELECT * FROM articles FINAL"  #contrib-balance-k-919
-  if (!is.null(where) && nzchar(where)) sql <- paste(sql, "WHERE", where)  #contrib-balance-k-920
-  sql <- paste(sql, "ORDER BY published_at DESC LIMIT", as.integer(limit))  #contrib-balance-k-921
-  DBI::dbGetQuery(con, sql)  #contrib-balance-k-922
-}  #contrib-balance-k-923
-  #contrib-balance-k-924
-#' Get aggregated topic statistics  #contrib-balance-k-925
-#'  #contrib-balance-k-926
-#' @param con DBI connection.  #contrib-balance-k-927
-#' @return Data frame with columns \code{topic_label}, \code{n_articles},  #contrib-balance-k-928
-#'   \code{first_article}, \code{last_article}.  #contrib-balance-k-929
-#' @export  #contrib-balance-k-930
-ch_topic_summary <- function(con) {  #contrib-balance-k-931
-  DBI::dbGetQuery(con, "  #contrib-balance-k-932
-    SELECT  #contrib-balance-k-933
-      topic_label,  #contrib-balance-k-934
-      count()            AS n_articles,  #contrib-balance-k-935
-      min(published_at)  AS first_article,  #contrib-balance-k-936
-      max(published_at)  AS last_article  #contrib-balance-k-937
-    FROM articles FINAL  #contrib-balance-k-938
-    WHERE topic_label != ''  #contrib-balance-k-939
-    GROUP BY topic_label  #contrib-balance-k-940
-    ORDER BY n_articles DESC  #contrib-balance-k-941
-  ")  #contrib-balance-k-942
-}  #contrib-balance-k-943
+  df$fetched_at[is.na(df$fetched_at)] <- Sys.time()  #contrib-balance-k-874  #cb-m
+  df$fetched_at <- as.POSIXct(df$fetched_at, tz = "UTC")  #contrib-balance-k-875  #cb-m
+  #contrib-balance-k-876  #cb-m
+  table_cols <- c(  #contrib-balance-k-877  #cb-m
+    "article_id",  #contrib-balance-k-878  #cb-m
+    "title",  #contrib-balance-k-879  #cb-m
+    "content",  #contrib-balance-k-880  #cb-m
+    "content_text",  #contrib-balance-k-881  #cb-m
+    "link",  #contrib-balance-k-882  #cb-m
+    "feed_id",  #contrib-balance-k-883  #cb-m
+    "feed_title",  #contrib-balance-k-884  #cb-m
+    "author",  #contrib-balance-k-885  #cb-m
+    "published_at",  #contrib-balance-k-886  #cb-m
+    "fetched_at",  #contrib-balance-k-887  #cb-m
+    "is_unread",  #contrib-balance-k-888  #cb-m
+    "is_starred",  #contrib-balance-k-889  #cb-m
+    "topic",  #contrib-balance-k-890  #cb-m
+    "topic_label",  #contrib-balance-k-891  #cb-m
+    "topic_prob"  #contrib-balance-k-892  #cb-m
+  )  #contrib-balance-k-893  #cb-m
+  #contrib-balance-k-894  #cb-m
+  df <- df[, table_cols, drop = FALSE]  #contrib-balance-k-895  #cb-m
+  #contrib-balance-k-896  #cb-m
+  DBI::dbWriteTable(  #contrib-balance-k-897  #cb-m
+    con,  #contrib-balance-k-898  #cb-m
+    "articles",  #contrib-balance-k-899  #cb-m
+    df,  #contrib-balance-k-900  #cb-m
+    append = TRUE,  #contrib-balance-k-901  #cb-m
+    overwrite = FALSE,  #contrib-balance-k-902  #cb-m
+    row.names = FALSE  #contrib-balance-k-903  #cb-m
+  )  #contrib-balance-k-904  #cb-m
+  #contrib-balance-k-905  #cb-m
+  cli::cli_inform("Wrote {nrow(df)} articles to ClickHouse.")  #contrib-balance-k-906  #cb-m
+  invisible(df)  #contrib-balance-k-907  #cb-m
+}  #contrib-balance-k-908  #cb-m
+  #contrib-balance-k-909  #cb-m
+#' Read articles from ClickHouse  #contrib-balance-k-910  #cb-m
+#'  #contrib-balance-k-911  #cb-m
+#' @param con   DBI connection.  #contrib-balance-k-912  #cb-m
+#' @param where Optional SQL WHERE expression, e.g.  #contrib-balance-k-913  #cb-m
+#'   \code{"topic_label = 'Политика'"}.  #contrib-balance-k-914  #cb-m
+#' @param limit Maximum rows.  #contrib-balance-k-915  #cb-m
+#' @return Data frame.  #contrib-balance-k-916  #cb-m
+#' @export  #contrib-balance-k-917  #cb-m
+ch_read_articles <- function(con, where = NULL, limit = 10000L) {  #contrib-balance-k-918  #cb-m
+  sql <- "SELECT * FROM articles FINAL"  #contrib-balance-k-919  #cb-m
+  if (!is.null(where) && nzchar(where)) sql <- paste(sql, "WHERE", where)  #contrib-balance-k-920  #cb-m
+  sql <- paste(sql, "ORDER BY published_at DESC LIMIT", as.integer(limit))  #contrib-balance-k-921  #cb-m
+  DBI::dbGetQuery(con, sql)  #contrib-balance-k-922  #cb-m
+}  #contrib-balance-k-923  #cb-m
+  #contrib-balance-k-924  #cb-m
+#' Get aggregated topic statistics  #contrib-balance-k-925  #cb-m
+#'  #contrib-balance-k-926  #cb-m
+#' @param con DBI connection.  #contrib-balance-k-927  #cb-m
+#' @return Data frame with columns \code{topic_label}, \code{n_articles},  #contrib-balance-k-928  #cb-m
+#'   \code{first_article}, \code{last_article}.  #contrib-balance-k-929  #cb-m
+#' @export  #contrib-balance-k-930  #cb-m
+ch_topic_summary <- function(con) {  #contrib-balance-k-931  #cb-m
+  DBI::dbGetQuery(con, "  #contrib-balance-k-932  #cb-m
+    SELECT  #contrib-balance-k-933  #cb-m
+      topic_label,  #contrib-balance-k-934  #cb-m
+      count()            AS n_articles,  #contrib-balance-k-935  #cb-m
+      min(published_at)  AS first_article,  #contrib-balance-k-936  #cb-m
+      max(published_at)  AS last_article  #contrib-balance-k-937  #cb-m
+    FROM articles FINAL  #contrib-balance-k-938  #cb-m
+    WHERE topic_label != ''  #contrib-balance-k-939  #cb-m
+    GROUP BY topic_label  #contrib-balance-k-940  #cb-m
+    ORDER BY n_articles DESC  #contrib-balance-k-941  #cb-m
+  ")  #contrib-balance-k-942  #cb-m
+}  #contrib-balance-k-943  #cb-m
