@@ -11,36 +11,63 @@ TTRSS_URL  <- Sys.getenv("TTRSS_URL", "http://localhost:8080")  #contrib-balance
 TTRSS_USER <- Sys.getenv("TTRSS_USER", "admin")  #contrib-balance-k-1120
 TTRSS_PASS <- Sys.getenv("TTRSS_PASSWORD", "password")  #contrib-balance-k-1121
   #contrib-balance-k-1122
-# ── Источники по категориям (только русскоязычные) ───────────────────────────  #contrib-balance-k-1123
-  #contrib-balance-k-1124
-feeds <- list(  #contrib-balance-k-1125
-  #contrib-balance-k-1126
-  # Исследования угроз — российские вендоры  #contrib-balance-k-1127
-  "Threat Research (RU)" = c(  #contrib-balance-k-1128
-    "https://securelist.ru/feed/",                                    # Kaspersky GReAT (рус.)  #contrib-balance-k-1129
-    "https://www.kaspersky.ru/blog/feed/",                            # Kaspersky блог  #contrib-balance-k-1130
-    "https://www.ptsecurity.com/ru-ru/about/news/rss/"               # Positive Technologies  #contrib-balance-k-1131
-  ),  #contrib-balance-k-1132
-  #contrib-balance-k-1133
-  # Новости ИБ — русскоязычные СМИ  #contrib-balance-k-1134
-  "ИБ-новости (RU)" = c(  #contrib-balance-k-1135
-    "https://www.anti-malware.ru/rss.xml",                            # Anti-Malware.ru  #contrib-balance-k-1136
-    "https://www.securitylab.ru/rss/",                                # SecurityLab  #contrib-balance-k-1137
-    "https://xakep.ru/feed/",                                         # Хакер.ру  #contrib-balance-k-1138
-    "https://cisoclub.ru/feed/"                                       # CISO Club  #contrib-balance-k-1139
-  ),  #contrib-balance-k-1140
-  #contrib-balance-k-1141
-  # Профессиональное сообщество  #contrib-balance-k-1142
-  "Сообщество (RU)" = c(  #contrib-balance-k-1143
-    "https://habr.com/ru/rss/hub/information_security/articles/",     # Хабр — ИБ  #contrib-balance-k-1144
-    "https://habr.com/ru/rss/hub/netsecurity/articles/"               # Хабр — сетевая безопасность  #contrib-balance-k-1145
-  ),  #contrib-balance-k-1146
-  #contrib-balance-k-1147
-  # Государственные / CERT  #contrib-balance-k-1148
-  "CERT / Регуляторы (RU)" = c(  #contrib-balance-k-1149
-    "https://bdu.fstec.ru/news/rss",                                  # БДУ ФСТЭК  #contrib-balance-k-1150
-    "https://safe-surf.ru/rss/"                                       # SafeSurf (НКЦКИ)  #contrib-balance-k-1151
-  )  #contrib-balance-k-1152
+# ── Источники: русскоязычные + англоязычные (высокий объём) ──────────────────
+feeds <- list(
+
+  # Исследования угроз — российские вендоры
+  "Threat Research (RU)" = c(
+    "https://securelist.ru/feed/",
+    "https://www.kaspersky.ru/blog/feed/",
+    "https://www.ptsecurity.com/ru-ru/about/news/rss/"
+  ),
+
+  # Новости ИБ — русскоязычные СМИ
+  "ИБ-новости (RU)" = c(
+    "https://www.anti-malware.ru/rss.xml",
+    "https://www.securitylab.ru/rss/",
+    "https://xakep.ru/feed/",
+    "https://cisoclub.ru/feed/"
+  ),
+
+  # Профессиональное сообщество (RU)
+  "Сообщество (RU)" = c(
+    "https://habr.com/ru/rss/hub/information_security/articles/",
+    "https://habr.com/ru/rss/hub/netsecurity/articles/"
+  ),
+
+  # CERT / Регуляторы (RU)
+  "CERT / Регуляторы (RU)" = c(
+    "https://bdu.fstec.ru/news/rss",
+    "https://safe-surf.ru/rss/"
+  ),
+
+  # Новости ИБ — высокообъёмные английские СМИ
+  "Security News (EN)" = c(
+    "https://feeds.feedburner.com/TheHackersNews",
+    "https://www.bleepingcomputer.com/feed/",
+    "https://www.securityweek.com/feed/",
+    "https://www.darkreading.com/rss.xml",
+    "https://cyberscoop.com/feed/",
+    "https://www.infosecurity-magazine.com/rss/news/",
+    "https://grahamcluley.com/feed/"
+  ),
+
+  # Threat Research — вендоры (EN)
+  "Threat Research (EN)" = c(
+    "https://krebsonsecurity.com/feed/",
+    "https://www.malwarebytes.com/blog/feed/",
+    "https://news.sophos.com/en-us/feed/",
+    "https://blog.talosintelligence.com/rss/",
+    "https://unit42.paloaltonetworks.com/feed/",
+    "https://securelist.com/feed/",
+    "https://research.checkpoint.com/feed/"
+  ),
+
+  # CERT / Advisories (EN)
+  "CERT / Advisories (EN)" = c(
+    "https://www.cisa.gov/uscert/ncas/alerts.xml",
+    "https://isc.sans.edu/rssfeed_full.xml"
+  )
 )  #contrib-balance-k-1153
   #contrib-balance-k-1154
 # ── Подключение ───────────────────────────────────────────────────────────────  #contrib-balance-k-1155
