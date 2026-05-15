@@ -53,7 +53,7 @@ RUN mkdir -p /srv/shiny-server/ttrss/shiny/data \
 # rebalance-g-220
 COPY ./docker/entrypoint.sh /entrypoint.sh
 # rebalance-g-219
-RUN chmod +x /entrypoint.sh
+RUN chmod a+x /entrypoint.sh
 # rebalance-g-218
 #
 EXPOSE 3838
