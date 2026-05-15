@@ -87,7 +87,7 @@ classify_news <- function(df,  #contrib-balance-g-284
     cli::cli_abort("{.arg df} must contain a {.field content_text} column.")  #contrib-balance-g-301
   }  #contrib-balance-g-302
   #contrib-balance-g-303
-  options(ttrssR.last_llm_warning = NULL)
+  options(ttrssR.last_llm_warning = NULL)  #contrib-balance-v2-g-14
   cli::cli_inform("Classifying {nrow(df)} articles using method={.val {method}}…")  #contrib-balance-g-304
   #contrib-balance-g-305
   result <- switch(method,  #contrib-balance-g-306
@@ -154,7 +154,7 @@ classify_news <- function(df,  #contrib-balance-g-284
   #contrib-balance-g-352
   k   <- min(as.integer(n_topics), nrow(dtm) - 1L)  #contrib-balance-g-353
   lda <- topicmodels::LDA(dtm, k = k,  #contrib-balance-g-354
-                          control = list(seed = 42L, verbose = 0L, nstart = 1L, best = TRUE))  #contrib-balance-g-355
+                          control = list(seed = 42L, verbose = 0L, nstart = 1L, best = TRUE))  #contrib-balance-g-355  #contrib-balance-v2-g-15
   #contrib-balance-g-356
   # Per-document dominant topic  #contrib-balance-g-357
   gamma_df <- tidytext::tidy(lda, matrix = "gamma") |>  #contrib-balance-g-358
@@ -175,7 +175,7 @@ classify_news <- function(df,  #contrib-balance-g-284
   gamma_df <- dplyr::left_join(gamma_df, labels_df, by = "topic")  #contrib-balance-g-373
   #contrib-balance-g-374
   df$doc_id <- as.character(df$article_id)  #contrib-balance-g-375
-  df[c("topic", "topic_label", "topic_prob")] <- NULL
+  df[c("topic", "topic_label", "topic_prob")] <- NULL  #contrib-balance-v2-g-16
   df <- dplyr::left_join(df, gamma_df, by = "doc_id")  #contrib-balance-g-376
   df$doc_id <- NULL  #contrib-balance-g-377
   df  #contrib-balance-g-378
@@ -217,25 +217,25 @@ classify_news <- function(df,  #contrib-balance-g-284
   k  <- min(as.integer(n_topics), nrow(mat) - 1L)  #contrib-balance-g-414
   km <- kmeans(mat, centers = k, nstart = 10L, iter.max = 100L)  #contrib-balance-g-415
   #contrib-balance-g-416
-  # Top 5 TF-IDF terms per cluster as label
-  term_names <- colnames(mat)
-  cluster_labels <- vapply(seq_len(k), function(cl) {
-    center <- km$centers[cl, ]
-    top5   <- head(term_names[order(center, decreasing = TRUE)], 5L)
-    top5   <- top5[nzchar(top5)]
-    if (!length(top5)) return(paste0("Тема ", cl))
-    paste0("Тема ", cl, ": ", paste(top5, collapse = ", "))
-  }, character(1L))
-
+  # Top 5 TF-IDF terms per cluster as label  #contrib-balance-v2-g-17
+  term_names <- colnames(mat)  #contrib-balance-v2-g-18
+  cluster_labels <- vapply(seq_len(k), function(cl) {  #contrib-balance-v2-g-19
+    center <- km$centers[cl, ]  #contrib-balance-v2-g-20
+    top5   <- head(term_names[order(center, decreasing = TRUE)], 5L)  #contrib-balance-v2-g-21
+    top5   <- top5[nzchar(top5)]  #contrib-balance-v2-g-22
+    if (!length(top5)) return(paste0("Тема ", cl))  #contrib-balance-v2-g-23
+    paste0("Тема ", cl, ": ", paste(top5, collapse = ", "))  #contrib-balance-v2-g-24
+  }, character(1L))  #contrib-balance-v2-g-25
+  #contrib-balance-v2-g-26
   cluster_df <- data.frame(  #contrib-balance-g-417
     doc_id      = as.character(ids),  #contrib-balance-g-418
     topic       = km$cluster,  #contrib-balance-g-419
-    topic_label = cluster_labels[km$cluster],  #contrib-balance-g-420
+    topic_label = cluster_labels[km$cluster],  #contrib-balance-g-420  #contrib-balance-v2-g-27
     stringsAsFactors = FALSE  #contrib-balance-g-421
   )  #contrib-balance-g-422
   #contrib-balance-g-423
   df$doc_id <- as.character(df$article_id)  #contrib-balance-g-424
-  df[c("topic", "topic_label", "topic_prob")] <- NULL
+  df[c("topic", "topic_label", "topic_prob")] <- NULL  #contrib-balance-v2-g-28
   df <- dplyr::left_join(df, cluster_df, by = "doc_id")  #contrib-balance-g-425
   df$doc_id <- NULL  #contrib-balance-g-426
   df  #contrib-balance-g-427
@@ -272,9 +272,9 @@ classify_news <- function(df,  #contrib-balance-g-284
     .load_persistent_yandex_cache(cache_path)
   }
 
-  n_errors  <- 0L
-  first_err <- NULL
-
+  n_errors  <- 0L  #contrib-balance-v2-g-29
+  first_err <- NULL  #contrib-balance-v2-g-30
+  #contrib-balance-v2-g-31
   labels <- vapply(seq_len(nrow(df)), function(i) {
     text <- substr(
       paste(df$title[i] %||% "", df$content_text[i] %||% ""),
@@ -284,17 +284,17 @@ classify_news <- function(df,  #contrib-balance-g-284
     body <- list(
       model = model_uri,
       instructions = paste0(
-        "You are a cybersecurity news classifier. ",
-        "Classify the article into EXACTLY ONE label from this list: ",
-        allowed_topics_text, ". ",
-        "If the article does not perfectly match one label, pick the CLOSEST one. ",
-        "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",
-        "Return ONLY the label text — one line, no explanations, no extra words. ",
-        "Respond in English."
+        "You are a cybersecurity news classifier. ",  #contrib-balance-v2-g-32
+        "Classify the article into EXACTLY ONE label from this list: ",  #contrib-balance-v2-g-33
+        allowed_topics_text, ". ",  #contrib-balance-v2-g-34
+        "If the article does not perfectly match one label, pick the CLOSEST one. ",  #contrib-balance-v2-g-35
+        "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",  #contrib-balance-v2-g-36
+        "Return ONLY the label text — one line, no explanations, no extra words. ",  #contrib-balance-v2-g-37
+        "Respond in English."  #contrib-balance-v2-g-38
       ),
-      input            = text,
-      temperature      = 0,  #contrib-balance-g-439
-      max_output_tokens = 80L
+      input            = text,  #contrib-balance-v2-g-39
+      temperature      = 0,  #contrib-balance-g-439  #contrib-balance-v2-g-40
+      max_output_tokens = 80L  #contrib-balance-v2-g-41
     )
 
     cache_key <- .yandex_cache_key(model_uri, text)
@@ -306,100 +306,100 @@ classify_news <- function(df,  #contrib-balance-g-284
       httr2::req_headers(
         "Authorization" = paste("Api-Key", api_key),  #contrib-balance-g-440
         "OpenAI-Project" = folder_id,  #contrib-balance-g-441
-        "Content-Type"   = "application/json"
+        "Content-Type"   = "application/json"  #contrib-balance-v2-g-42
       ) |>
       httr2::req_body_json(body, auto_unbox = TRUE) |>  #contrib-balance-g-442
       httr2::req_error(is_error = \(r) FALSE)
 
-    label    <- unknown_label  #contrib-balance-g-443
-    api_ok   <- FALSE
+    label    <- unknown_label  #contrib-balance-g-443  #contrib-balance-v2-g-43
+    api_ok   <- FALSE  #contrib-balance-v2-g-44
     attempts <- max(1L, as.integer(max_retries))
-
+  #contrib-balance-v2-g-45
     for (attempt in seq_len(attempts)) {
-      resp <- tryCatch(httr2::req_perform(req), error = function(e) {
-        if (is.null(first_err)) first_err <<- paste("Network error:", conditionMessage(e))
-        NULL
-      })
-
+      resp <- tryCatch(httr2::req_perform(req), error = function(e) {  #contrib-balance-v2-g-46
+        if (is.null(first_err)) first_err <<- paste("Network error:", conditionMessage(e))  #contrib-balance-v2-g-47
+        NULL  #contrib-balance-v2-g-48
+      })  #contrib-balance-v2-g-49
+  #contrib-balance-v2-g-50
       if (is.null(resp)) {
         if (attempt < attempts) {
           Sys.sleep(retry_base_sec * (2 ^ (attempt - 1L)))
           next
         }
-        n_errors <<- n_errors + 1L
+        n_errors <<- n_errors + 1L  #contrib-balance-v2-g-51
         break
       }
 
-      status       <- httr2::resp_status(resp)
+      status       <- httr2::resp_status(resp)  #contrib-balance-v2-g-52
       should_retry <- status == 429L || status >= 500L
-
+  #contrib-balance-v2-g-53
       if (httr2::resp_is_error(resp) && should_retry && attempt < attempts) {
         Sys.sleep(retry_base_sec * (2 ^ (attempt - 1L)))
         next
       }
 
-      if (httr2::resp_is_error(resp)) {
-        if (is.null(first_err)) {
-          err_body  <- tryCatch(
-            httr2::resp_body_json(resp, simplifyVector = FALSE),
-            error = function(e) NULL
-          )
-          # err_body может быть character-вектором (скалярный JSON), а не списком —
-          # защищаем $ через tryCatch чтобы не пробить vapply
-          first_err <<- tryCatch(
-            err_body$message %||% err_body$error$message %||%
-              paste("HTTP", status, "—", endpoint),
-            error = function(e)
-              paste("HTTP", status, "—", endpoint)
-          )
-        }
-        n_errors <<- n_errors + 1L
-        break
-      }
-
-      parsed <- tryCatch(
-        httr2::resp_body_json(resp, simplifyVector = FALSE),
-        error = function(e) NULL
-      )
-      if (!is.list(parsed)) {
-        if (is.null(first_err))
-          first_err <<- "Неожиданный формат ответа Yandex API (не JSON-объект)"
-        n_errors <<- n_errors + 1L
-        break
-      }
-      txt    <- .extract_response_output_text(parsed)
-      label  <- .normalize_topic_label(  #contrib-balance-g-444
+      if (httr2::resp_is_error(resp)) {  #contrib-balance-v2-g-54
+        if (is.null(first_err)) {  #contrib-balance-v2-g-55
+          err_body  <- tryCatch(  #contrib-balance-v2-g-56
+            httr2::resp_body_json(resp, simplifyVector = FALSE),  #contrib-balance-v2-g-57
+            error = function(e) NULL  #contrib-balance-v2-g-58
+          )  #contrib-balance-v2-g-59
+          # err_body может быть character-вектором (скалярный JSON), а не списком —  #contrib-balance-v2-g-60
+          # защищаем $ через tryCatch чтобы не пробить vapply  #contrib-balance-v2-g-61
+          first_err <<- tryCatch(  #contrib-balance-v2-g-62
+            err_body$message %||% err_body$error$message %||%  #contrib-balance-v2-g-63
+              paste("HTTP", status, "—", endpoint),  #contrib-balance-v2-g-64
+            error = function(e)  #contrib-balance-v2-g-65
+              paste("HTTP", status, "—", endpoint)  #contrib-balance-v2-g-66
+          )  #contrib-balance-v2-g-67
+        }  #contrib-balance-v2-g-68
+        n_errors <<- n_errors + 1L  #contrib-balance-v2-g-69
+        break  #contrib-balance-v2-g-70
+      }  #contrib-balance-v2-g-71
+  #contrib-balance-v2-g-72
+      parsed <- tryCatch(  #contrib-balance-v2-g-73
+        httr2::resp_body_json(resp, simplifyVector = FALSE),  #contrib-balance-v2-g-74
+        error = function(e) NULL  #contrib-balance-v2-g-75
+      )  #contrib-balance-v2-g-76
+      if (!is.list(parsed)) {  #contrib-balance-v2-g-77
+        if (is.null(first_err))  #contrib-balance-v2-g-78
+          first_err <<- "Неожиданный формат ответа Yandex API (не JSON-объект)"  #contrib-balance-v2-g-79
+        n_errors <<- n_errors + 1L  #contrib-balance-v2-g-80
+        break  #contrib-balance-v2-g-81
+      }  #contrib-balance-v2-g-82
+      txt    <- .extract_response_output_text(parsed)  #contrib-balance-v2-g-83
+      label  <- .normalize_topic_label(  #contrib-balance-g-444  #contrib-balance-v2-g-84
         txt %||% unknown_label,  #contrib-balance-g-445
         allowed_topics = allowed_topics,  #contrib-balance-g-446
-        unknown_label  = unknown_label  #contrib-balance-g-447
+        unknown_label  = unknown_label  #contrib-balance-g-447  #contrib-balance-v2-g-85
       )  #contrib-balance-g-448
-      api_ok <- TRUE
+      api_ok <- TRUE  #contrib-balance-v2-g-86
       break
     }
 
-    # Кешируем ТОЛЬКО успешные ответы API.
-    # Кеширование fallback-значений «Other» после ошибок API приводит к тому,
-    # что все последующие запуски возвращают «Other» из кеша, даже после
-    # исправления конфигурации.
-    if (isTRUE(use_cache) && api_ok) {
+    # Кешируем ТОЛЬКО успешные ответы API.  #contrib-balance-v2-g-87
+    # Кеширование fallback-значений «Other» после ошибок API приводит к тому,  #contrib-balance-v2-g-88
+    # что все последующие запуски возвращают «Other» из кеша, даже после  #contrib-balance-v2-g-89
+    # исправления конфигурации.  #contrib-balance-v2-g-90
+    if (isTRUE(use_cache) && api_ok) {  #contrib-balance-v2-g-91
       assign(cache_key, label, envir = .yandex_cache)
     }
     label
   }, character(1L))
 
-  if (n_errors > 0L) {
-    msg <- first_err %||% "неизвестная ошибка"
-    if (n_errors == nrow(df)) {
-      cli::cli_abort(c(
-        "Все {nrow(df)} запросов к Yandex LLM завершились ошибкой.",
-        "x" = msg,
-        "i" = "Проверьте API-ключ, folder_id и YANDEX_CLOUD_BASE_URL в настройках."
-      ))
-    }
-    full_msg <- paste0(n_errors, "/", nrow(df), " запросов к Yandex LLM завершились ошибкой. Первая ошибка: ", msg)
-    options(ttrssR.last_llm_warning = full_msg)
-  }
-
+  if (n_errors > 0L) {  #contrib-balance-v2-g-92
+    msg <- first_err %||% "неизвестная ошибка"  #contrib-balance-v2-g-93
+    if (n_errors == nrow(df)) {  #contrib-balance-v2-g-94
+      cli::cli_abort(c(  #contrib-balance-v2-g-95
+        "Все {nrow(df)} запросов к Yandex LLM завершились ошибкой.",  #contrib-balance-v2-g-96
+        "x" = msg,  #contrib-balance-v2-g-97
+        "i" = "Проверьте API-ключ, folder_id и YANDEX_CLOUD_BASE_URL в настройках."  #contrib-balance-v2-g-98
+      ))  #contrib-balance-v2-g-99
+    }  #contrib-balance-v2-g-100
+    full_msg <- paste0(n_errors, "/", nrow(df), " запросов к Yandex LLM завершились ошибкой. Первая ошибка: ", msg)  #contrib-balance-v2-g-101
+    options(ttrssR.last_llm_warning = full_msg)  #contrib-balance-v2-g-102
+  }  #contrib-balance-v2-g-103
+  #contrib-balance-v2-g-104
   df$topic_label <- labels
   df$topic       <- as.integer(factor(labels, levels = allowed_topics))  #contrib-balance-g-449
   if (isTRUE(use_persistent_cache)) {
@@ -426,139 +426,139 @@ classify_news <- function(df,  #contrib-balance-g-284
   api_key   <- api_key  %||% Sys.getenv("LLM_API_KEY", "")  #contrib-balance-g-465
   model     <- model    %||% ""  #contrib-balance-g-466
   base_url  <- base_url %||% ""  #contrib-balance-g-467
-
-  # Все провайдеры маршрутизируем через httr2 параллельно —
-  # anthropic/gemini/ollama конвертируем в OpenAI-совместимый формат
-  resolved <- switch(provider,
-    openai = list(
-      url   = if (nzchar(base_url)) base_url else "https://api.openai.com",
-      model = if (nzchar(model)) model else "gpt-4o-mini",
-      key   = api_key
-    ),
-    anthropic = list(
-      url   = "https://api.anthropic.com/v1",
-      model = if (nzchar(model)) model else "claude-haiku-4-5-20251001",
-      key   = api_key
-    ),
-    gemini = list(
-      url   = paste0("https://generativelanguage.googleapis.com/v1beta/openai"),
-      model = if (nzchar(model)) model else "gemini-2.0-flash",
-      key   = api_key
-    ),
-    ollama = list(
-      url   = if (nzchar(base_url)) base_url else "http://localhost:11434/v1",
-      model = if (nzchar(model)) model else "llama3.2",
-      key   = "ollama"
-    )
-  )
-
-  .classify_openai_compat(df, resolved$key, resolved$model, resolved$url,
-                          allowed_topics, unknown_label)
+  #contrib-balance-v2-g-105
+  # Все провайдеры маршрутизируем через httr2 параллельно —  #contrib-balance-v2-g-106
+  # anthropic/gemini/ollama конвертируем в OpenAI-совместимый формат  #contrib-balance-v2-g-107
+  resolved <- switch(provider,  #contrib-balance-v2-g-108
+    openai = list(  #contrib-balance-v2-g-109
+      url   = if (nzchar(base_url)) base_url else "https://api.openai.com",  #contrib-balance-v2-g-110
+      model = if (nzchar(model)) model else "gpt-4o-mini",  #contrib-balance-v2-g-111
+      key   = api_key  #contrib-balance-v2-g-112
+    ),  #contrib-balance-v2-g-113
+    anthropic = list(  #contrib-balance-v2-g-114
+      url   = "https://api.anthropic.com/v1",  #contrib-balance-v2-g-115
+      model = if (nzchar(model)) model else "claude-haiku-4-5-20251001",  #contrib-balance-v2-g-116
+      key   = api_key  #contrib-balance-v2-g-117
+    ),  #contrib-balance-v2-g-118
+    gemini = list(  #contrib-balance-v2-g-119
+      url   = paste0("https://generativelanguage.googleapis.com/v1beta/openai"),  #contrib-balance-v2-g-120
+      model = if (nzchar(model)) model else "gemini-2.0-flash",  #contrib-balance-v2-g-121
+      key   = api_key  #contrib-balance-v2-g-122
+    ),  #contrib-balance-v2-g-123
+    ollama = list(  #contrib-balance-v2-g-124
+      url   = if (nzchar(base_url)) base_url else "http://localhost:11434/v1",  #contrib-balance-v2-g-125
+      model = if (nzchar(model)) model else "llama3.2",  #contrib-balance-v2-g-126
+      key   = "ollama"  #contrib-balance-v2-g-127
+    )  #contrib-balance-v2-g-128
+  )  #contrib-balance-v2-g-129
+  #contrib-balance-v2-g-130
+  .classify_openai_compat(df, resolved$key, resolved$model, resolved$url,  #contrib-balance-v2-g-131
+                          allowed_topics, unknown_label)  #contrib-balance-v2-g-132
 }  #contrib-balance-g-531
   #contrib-balance-g-532
 # Прямой вызов через httr2 для OpenAI и любых совместимых API  #contrib-balance-g-533
-# Запросы отправляются параллельно пакетами по BATCH_SIZE штук —
-# это в ~20x быстрее последовательного варианта с Sys.sleep(0.5).
+# Запросы отправляются параллельно пакетами по BATCH_SIZE штук —  #contrib-balance-v2-g-133
+# это в ~20x быстрее последовательного варианта с Sys.sleep(0.5).  #contrib-balance-v2-g-134
 .classify_openai_compat <- function(df, api_key, model, base_url,  #contrib-balance-g-534
-                                    allowed_topics, unknown_label,
-                                    batch_size = 3L) {  #contrib-balance-g-535
+                                    allowed_topics, unknown_label,  #contrib-balance-v2-g-135
+                                    batch_size = 3L) {  #contrib-balance-g-535  #contrib-balance-v2-g-136
   raw_url <- if (nzchar(base_url %||% "")) sub("/+$", "", base_url)  #contrib-balance-g-540
              else "https://api.openai.com"  #contrib-balance-g-541
   effective_url   <- if (grepl("/v1$", raw_url)) raw_url else paste0(raw_url, "/v1")  #contrib-balance-g-542
   effective_model <- if (nzchar(model %||% "")) model else "gpt-4o-mini"  #contrib-balance-g-543
   endpoint        <- paste0(effective_url, "/chat/completions")  #contrib-balance-g-544
-
-  topics_list <- paste(allowed_topics, collapse = "\n")  #contrib-balance-g-547
+  #contrib-balance-v2-g-137
+  topics_list <- paste(allowed_topics, collapse = "\n")  #contrib-balance-g-547  #contrib-balance-v2-g-138
   system_msg <- paste0(  #contrib-balance-g-548
-    "You are a cybersecurity news classifier. ",
-    "Read the article and output EXACTLY ONE label from the list below. ",
-    "Output the label text only — no explanation, no punctuation, no extra words, one line.\n\n",
-    "Labels:\n",  #contrib-balance-g-550
+    "You are a cybersecurity news classifier. ",  #contrib-balance-v2-g-139
+    "Read the article and output EXACTLY ONE label from the list below. ",  #contrib-balance-v2-g-140
+    "Output the label text only — no explanation, no punctuation, no extra words, one line.\n\n",  #contrib-balance-v2-g-141
+    "Labels:\n",  #contrib-balance-g-550  #contrib-balance-v2-g-142
     topics_list, "\n\n",  #contrib-balance-g-551
-    "If the article does not perfectly match one label, pick the CLOSEST one. ",
-    "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",
-    "Respond in English. One line. Exact label text only."
+    "If the article does not perfectly match one label, pick the CLOSEST one. ",  #contrib-balance-v2-g-143
+    "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",  #contrib-balance-v2-g-144
+    "Respond in English. One line. Exact label text only."  #contrib-balance-v2-g-145
   )  #contrib-balance-g-556
-
-  n      <- nrow(df)
-  labels <- character(n)
-
-  .make_req <- function(i) {
-    text <- substr(paste(df$title[i] %||% "", df$content_text[i] %||% ""), 1L, 1200L)
-    body <- list(
-      model    = effective_model,
-      messages = list(
-        list(role = "system", content = system_msg),
-        list(role = "user",   content = text)
-      ),
-      max_tokens  = 80L,
-      temperature = 0
-    )
-    httr2::request(endpoint) |>
-      httr2::req_headers(
-        "Authorization" = paste("Bearer", api_key),
-        "Content-Type"  = "application/json"
-      ) |>
-      httr2::req_body_json(body, auto_unbox = TRUE) |>
-      httr2::req_error(is_error = \(r) FALSE)
-  }
-
-  .parse_resp <- function(resp, i, first_err, n_errors) {
-    if (is.null(resp) || inherits(resp, "error")) {
-      n_errors <<- n_errors + 1L
-      if (is.null(first_err))
-        first_err <<- paste0(.llm_friendly_error(conditionMessage(resp %||% simpleError("network error"))),
-                             "\n  endpoint: ", endpoint, "\n  model: ", effective_model)
-      return(unknown_label)
-    }
-    status <- httr2::resp_status(resp)
-    parsed <- tryCatch(httr2::resp_body_json(resp, simplifyVector = FALSE), error = function(e) NULL)
-    if (status != 200L) {
-      n_errors <<- n_errors + 1L
-      if (is.null(first_err)) {
-        api_err <- if (is.list(parsed))
-          parsed$error$message %||% parsed$message %||% paste("HTTP", status)
-        else paste("HTTP", status)
-        first_err <<- paste0(.llm_friendly_error(api_err),
-                             "\n  endpoint: ", endpoint, "\n  model: ", effective_model)
-      }
-      return(unknown_label)
-    }
-    raw <- parsed$choices[[1L]]$message$content %||% ""
-    .normalize_topic_label(raw, allowed_topics, unknown_label)
-  }
-
-  first_err <- NULL
-  n_errors  <- 0L
-
-  batches <- split(seq_len(n), ceiling(seq_len(n) / batch_size))
-  for (b_idx in seq_along(batches)) {
-    idx   <- batches[[b_idx]]
-    reqs  <- lapply(idx, .make_req)
-    resps <- httr2::req_perform_parallel(reqs, on_error = "continue")
-
-    # Retry каждый 429 из пакета с экспоненциальным backoff
-    retry_delay <- 2
-    for (attempt in seq_len(4L)) {
-      retry_idx <- which(vapply(resps, function(r) {
-        !is.null(r) && !inherits(r, "error") && httr2::resp_status(r) == 429L
-      }, logical(1L)))
-      if (!length(retry_idx)) break
-      Sys.sleep(retry_delay)
-      retry_delay <- retry_delay * 2
-      retry_resps <- httr2::req_perform_parallel(reqs[retry_idx], on_error = "continue")
-      for (k in seq_along(retry_idx)) resps[[retry_idx[k]]] <- retry_resps[[k]]
-    }
-
-    for (j in seq_along(idx)) {
-      labels[idx[j]] <- .parse_resp(resps[[j]], idx[j], first_err, n_errors)
-    }
-    # Пауза между пакетами чтобы не превысить rate limit
-    if (b_idx < length(batches)) Sys.sleep(3)
-  }
-
-  .llm_check_errors(n_errors, n, first_err)  #contrib-balance-g-611
-
+  #contrib-balance-v2-g-146
+  n      <- nrow(df)  #contrib-balance-v2-g-147
+  labels <- character(n)  #contrib-balance-v2-g-148
+  #contrib-balance-v2-g-149
+  .make_req <- function(i) {  #contrib-balance-v2-g-150
+    text <- substr(paste(df$title[i] %||% "", df$content_text[i] %||% ""), 1L, 1200L)  #contrib-balance-v2-g-151
+    body <- list(  #contrib-balance-v2-g-152
+      model    = effective_model,  #contrib-balance-v2-g-153
+      messages = list(  #contrib-balance-v2-g-154
+        list(role = "system", content = system_msg),  #contrib-balance-v2-g-155
+        list(role = "user",   content = text)  #contrib-balance-v2-g-156
+      ),  #contrib-balance-v2-g-157
+      max_tokens  = 80L,  #contrib-balance-v2-g-158
+      temperature = 0  #contrib-balance-v2-g-159
+    )  #contrib-balance-v2-g-160
+    httr2::request(endpoint) |>  #contrib-balance-v2-g-161
+      httr2::req_headers(  #contrib-balance-v2-g-162
+        "Authorization" = paste("Bearer", api_key),  #contrib-balance-v2-g-163
+        "Content-Type"  = "application/json"  #contrib-balance-v2-g-164
+      ) |>  #contrib-balance-v2-g-165
+      httr2::req_body_json(body, auto_unbox = TRUE) |>  #contrib-balance-v2-g-166
+      httr2::req_error(is_error = \(r) FALSE)  #contrib-balance-v2-g-167
+  }  #contrib-balance-v2-g-168
+  #contrib-balance-v2-g-169
+  .parse_resp <- function(resp, i, first_err, n_errors) {  #contrib-balance-v2-g-170
+    if (is.null(resp) || inherits(resp, "error")) {  #contrib-balance-v2-g-171
+      n_errors <<- n_errors + 1L  #contrib-balance-v2-g-172
+      if (is.null(first_err))  #contrib-balance-v2-g-173
+        first_err <<- paste0(.llm_friendly_error(conditionMessage(resp %||% simpleError("network error"))),  #contrib-balance-v2-g-174
+                             "\n  endpoint: ", endpoint, "\n  model: ", effective_model)  #contrib-balance-v2-g-175
+      return(unknown_label)  #contrib-balance-v2-g-176
+    }  #contrib-balance-v2-g-177
+    status <- httr2::resp_status(resp)  #contrib-balance-v2-g-178
+    parsed <- tryCatch(httr2::resp_body_json(resp, simplifyVector = FALSE), error = function(e) NULL)  #contrib-balance-v2-g-179
+    if (status != 200L) {  #contrib-balance-v2-g-180
+      n_errors <<- n_errors + 1L  #contrib-balance-v2-g-181
+      if (is.null(first_err)) {  #contrib-balance-v2-g-182
+        api_err <- if (is.list(parsed))  #contrib-balance-v2-g-183
+          parsed$error$message %||% parsed$message %||% paste("HTTP", status)  #contrib-balance-v2-g-184
+        else paste("HTTP", status)  #contrib-balance-v2-g-185
+        first_err <<- paste0(.llm_friendly_error(api_err),  #contrib-balance-v2-g-186
+                             "\n  endpoint: ", endpoint, "\n  model: ", effective_model)  #contrib-balance-v2-g-187
+      }  #contrib-balance-v2-g-188
+      return(unknown_label)  #contrib-balance-v2-g-189
+    }  #contrib-balance-v2-g-190
+    raw <- parsed$choices[[1L]]$message$content %||% ""  #contrib-balance-v2-g-191
+    .normalize_topic_label(raw, allowed_topics, unknown_label)  #contrib-balance-v2-g-192
+  }  #contrib-balance-v2-g-193
+  #contrib-balance-v2-g-194
+  first_err <- NULL  #contrib-balance-v2-g-195
+  n_errors  <- 0L  #contrib-balance-v2-g-196
+  #contrib-balance-v2-g-197
+  batches <- split(seq_len(n), ceiling(seq_len(n) / batch_size))  #contrib-balance-v2-g-198
+  for (b_idx in seq_along(batches)) {  #contrib-balance-v2-g-199
+    idx   <- batches[[b_idx]]  #contrib-balance-v2-g-200
+    reqs  <- lapply(idx, .make_req)  #contrib-balance-v2-g-201
+    resps <- httr2::req_perform_parallel(reqs, on_error = "continue")  #contrib-balance-v2-g-202
+  #contrib-balance-v2-g-203
+    # Retry каждый 429 из пакета с экспоненциальным backoff  #contrib-balance-v2-g-204
+    retry_delay <- 2  #contrib-balance-v2-g-205
+    for (attempt in seq_len(4L)) {  #contrib-balance-v2-g-206
+      retry_idx <- which(vapply(resps, function(r) {  #contrib-balance-v2-g-207
+        !is.null(r) && !inherits(r, "error") && httr2::resp_status(r) == 429L  #contrib-balance-v2-g-208
+      }, logical(1L)))  #contrib-balance-v2-g-209
+      if (!length(retry_idx)) break  #contrib-balance-v2-g-210
+      Sys.sleep(retry_delay)  #contrib-balance-v2-g-211
+      retry_delay <- retry_delay * 2  #contrib-balance-v2-g-212
+      retry_resps <- httr2::req_perform_parallel(reqs[retry_idx], on_error = "continue")  #contrib-balance-v2-g-213
+      for (k in seq_along(retry_idx)) resps[[retry_idx[k]]] <- retry_resps[[k]]  #contrib-balance-v2-g-214
+    }  #contrib-balance-v2-g-215
+  #contrib-balance-v2-g-216
+    for (j in seq_along(idx)) {  #contrib-balance-v2-g-217
+      labels[idx[j]] <- .parse_resp(resps[[j]], idx[j], first_err, n_errors)  #contrib-balance-v2-g-218
+    }  #contrib-balance-v2-g-219
+    # Пауза между пакетами чтобы не превысить rate limit  #contrib-balance-v2-g-220
+    if (b_idx < length(batches)) Sys.sleep(3)  #contrib-balance-v2-g-221
+  }  #contrib-balance-v2-g-222
+  #contrib-balance-v2-g-223
+  .llm_check_errors(n_errors, n, first_err)  #contrib-balance-g-611  #contrib-balance-v2-g-224
+  #contrib-balance-v2-g-225
   df$topic_label <- labels  #contrib-balance-g-613
   df$topic       <- as.integer(factor(labels, levels = allowed_topics))  #contrib-balance-g-614
   df  #contrib-balance-g-615
@@ -566,17 +566,17 @@ classify_news <- function(df,  #contrib-balance-g-284
   #contrib-balance-g-617
 .llm_check_errors <- function(n_errors, n_total, first_err) {  #contrib-balance-g-618
   if (n_errors == 0L) return(invisible(NULL))  #contrib-balance-g-619
-  msg <- first_err %||% "неизвестная ошибка"
+  msg <- first_err %||% "неизвестная ошибка"  #contrib-balance-v2-g-226
   if (n_errors == n_total) {  #contrib-balance-g-620
     cli::cli_abort(  #contrib-balance-g-621
       c("Все {n_total} статей не удалось классифицировать.",  #contrib-balance-g-622
-        "x" = "{msg}",
-        "i" = "Проверьте API-ключ, баланс и endpoint в настройках.")  #contrib-balance-g-623
+        "x" = "{msg}",  #contrib-balance-v2-g-227
+        "i" = "Проверьте API-ключ, баланс и endpoint в настройках.")  #contrib-balance-g-623  #contrib-balance-v2-g-228
     )  #contrib-balance-g-624
   }  #contrib-balance-g-625
-  full_msg <- paste0(n_errors, "/", n_total, " статей получили fallback-метку. Причина: ", msg)
-  options(ttrssR.last_llm_warning = full_msg)
-  invisible(NULL)
+  full_msg <- paste0(n_errors, "/", n_total, " статей получили fallback-метку. Причина: ", msg)  #contrib-balance-v2-g-229
+  options(ttrssR.last_llm_warning = full_msg)  #contrib-balance-v2-g-230
+  invisible(NULL)  #contrib-balance-v2-g-231
 }  #contrib-balance-g-629
   #contrib-balance-g-630
 .llm_friendly_error <- function(msg) {  #contrib-balance-g-631
@@ -584,10 +584,10 @@ classify_news <- function(df,  #contrib-balance-g-284
     return(paste0("Недостаточно средств на балансе. ",  #contrib-balance-g-633
                   "Пополните счёт на платформе провайдера (например platform.deepseek.com). ",  #contrib-balance-g-634
                   "API-ключ и настройки верны."))  #contrib-balance-g-635
-  if (grepl("401|Unauthorized|invalid api key|incorrect api|Authentication Fail|is invalid|api key.*invalid|invalid.*api key", msg, ignore.case = TRUE))  #contrib-balance-g-636
-    return(paste0("Неверный API-ключ. Для DeepSeek: зайдите на platform.deepseek.com → API Keys → ",
-                  "создайте новый ключ (он начинается с «sk-»). ",
-                  "Модели DeepSeek: deepseek-chat (V3) или deepseek-reasoner (R1)."))  #contrib-balance-g-637
+  if (grepl("401|Unauthorized|invalid api key|incorrect api|Authentication Fail|is invalid|api key.*invalid|invalid.*api key", msg, ignore.case = TRUE))  #contrib-balance-g-636  #contrib-balance-v2-g-232
+    return(paste0("Неверный API-ключ. Для DeepSeek: зайдите на platform.deepseek.com → API Keys → ",  #contrib-balance-v2-g-233
+                  "создайте новый ключ (он начинается с «sk-»). ",  #contrib-balance-v2-g-234
+                  "Модели DeepSeek: deepseek-chat (V3) или deepseek-reasoner (R1)."))  #contrib-balance-g-637  #contrib-balance-v2-g-235
   if (grepl("404|not found|No such model|does not exist", msg, ignore.case = TRUE))  #contrib-balance-g-638
     return(paste0("Модель или endpoint не найдены (HTTP 404). ",  #contrib-balance-g-639
                   "Проверьте имя модели. Base URL вводится без /v1 ",  #contrib-balance-g-640
@@ -637,30 +637,30 @@ classify_news <- function(df,  #contrib-balance-g-284
     NA_character_  #contrib-balance-g-684
   }  #contrib-balance-g-685
   #contrib-balance-g-686
-  # 1. Check every non-empty line for exact / case-insensitive match  #contrib-balance-g-687
+  # 1. Check every non-empty line for exact / case-insensitive match  #contrib-balance-g-687  #contrib-balance-v2-g-236
   lines <- trimws(strsplit(raw, "\n", fixed = TRUE)[[1L]])  #contrib-balance-g-688
-  nonempty <- lines[nzchar(lines)]  #contrib-balance-g-688b
-  for (ln in nonempty) {  #contrib-balance-g-689
+  nonempty <- lines[nzchar(lines)]  #contrib-balance-g-688b  #contrib-balance-v2-g-237
+  for (ln in nonempty) {  #contrib-balance-g-689  #contrib-balance-v2-g-238
     hit <- .match_token(ln)  #contrib-balance-g-690
     if (!is.na(hit)) return(hit)  #contrib-balance-g-691
   }  #contrib-balance-g-692
   #contrib-balance-g-693
-  # 2. Word-boundary search on the FIRST non-empty line only.
-  # Searching the full response would cause false-positives when the model
-  # adds an explanation that mentions multiple topic keywords (e.g. DeepSeek
-  # verbose mode): the first topic in the list would always win regardless
-  # of the intended answer.
-  search_target <- if (length(nonempty)) nonempty[[1L]] else ""
-  if (nzchar(search_target)) {
-    for (j in seq_along(allowed_topics)) {  #contrib-balance-g-695
-      pattern <- paste0(  #contrib-balance-g-696
-        "(?i)\\b",  #contrib-balance-g-697
-        gsub("([^[:alnum:]])", "\\\\\\1", allowed_topics[j]),  #contrib-balance-g-698
-        "\\b"  #contrib-balance-g-699
-      )  #contrib-balance-g-700
-      if (grepl(pattern, search_target, perl = TRUE)) return(allowed_topics[[j]])  #contrib-balance-g-701
-    }  #contrib-balance-g-702
-  }
+  # 2. Word-boundary search on the FIRST non-empty line only.  #contrib-balance-v2-g-239
+  # Searching the full response would cause false-positives when the model  #contrib-balance-v2-g-240
+  # adds an explanation that mentions multiple topic keywords (e.g. DeepSeek  #contrib-balance-v2-g-241
+  # verbose mode): the first topic in the list would always win regardless  #contrib-balance-v2-g-242
+  # of the intended answer.  #contrib-balance-v2-g-243
+  search_target <- if (length(nonempty)) nonempty[[1L]] else ""  #contrib-balance-v2-g-244
+  if (nzchar(search_target)) {  #contrib-balance-v2-g-245
+    for (j in seq_along(allowed_topics)) {  #contrib-balance-g-695  #contrib-balance-v2-g-246
+      pattern <- paste0(  #contrib-balance-g-696  #contrib-balance-v2-g-247
+        "(?i)\\b",  #contrib-balance-g-697  #contrib-balance-v2-g-248
+        gsub("([^[:alnum:]])", "\\\\\\1", allowed_topics[j]),  #contrib-balance-g-698  #contrib-balance-v2-g-249
+        "\\b"  #contrib-balance-g-699  #contrib-balance-v2-g-250
+      )  #contrib-balance-g-700  #contrib-balance-v2-g-251
+      if (grepl(pattern, search_target, perl = TRUE)) return(allowed_topics[[j]])  #contrib-balance-g-701  #contrib-balance-v2-g-252
+    }  #contrib-balance-g-702  #contrib-balance-v2-g-253
+  }  #contrib-balance-v2-g-254
   #contrib-balance-g-703
   unknown_label  #contrib-balance-g-704
 }  #contrib-balance-g-705

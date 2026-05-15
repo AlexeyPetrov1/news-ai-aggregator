@@ -30,15 +30,15 @@ fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967
   #contrib-balance-k-973
   sid <- ttrss_login(base_url, user, password)  #contrib-balance-k-974
   on.exit(ttrss_logout(base_url, sid), add = TRUE)  #contrib-balance-k-975
-
-  # Build feed_id -> title lookup from TT-RSS (getFeeds returns real titles)
-  feeds_raw <- tryCatch(ttrss_get_feeds(base_url, sid), error = function(e) NULL)
-  feed_lookup <- if (!is.null(feeds_raw) && "id" %in% names(feeds_raw) &&
-                       "title" %in% names(feeds_raw)) {
-    setNames(as.character(feeds_raw$title), as.character(feeds_raw$id))
-  } else {
-    character(0)
-  }
+  #contrib-balance-v2-g-255
+  # Build feed_id -> title lookup from TT-RSS (getFeeds returns real titles)  #contrib-balance-v2-g-256
+  feeds_raw <- tryCatch(ttrss_get_feeds(base_url, sid), error = function(e) NULL)  #contrib-balance-v2-g-257
+  feed_lookup <- if (!is.null(feeds_raw) && "id" %in% names(feeds_raw) &&  #contrib-balance-v2-g-258
+                       "title" %in% names(feeds_raw)) {  #contrib-balance-v2-g-259
+    setNames(as.character(feeds_raw$title), as.character(feeds_raw$id))  #contrib-balance-v2-g-260
+  } else {  #contrib-balance-v2-g-261
+    character(0)  #contrib-balance-v2-g-262
+  }  #contrib-balance-v2-g-263
   #contrib-balance-k-976
   batch_size <- min(as.integer(batch_size), 200L)  #contrib-balance-k-977
   collected  <- list()  #contrib-balance-k-978

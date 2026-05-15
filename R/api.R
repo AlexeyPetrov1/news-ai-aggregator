@@ -134,7 +134,7 @@ ttrss_get_headlines <- function(base_url, session_id,  #contrib-balance-g-122
                               is_cat               = is_cat,  #contrib-balance-g-134
                               show_content         = TRUE,  #contrib-balance-g-135
                               include_attachments  = FALSE,  #contrib-balance-g-136
-                              order_by             = "feed_dates"))  #contrib-balance-g-137
+                              order_by             = "feed_dates"))  #contrib-balance-g-137  #contrib-balance-v2-g-1
   if (length(content) == 0) return(data.frame())  #contrib-balance-g-138
   .rows_to_df(content)  #contrib-balance-g-139
 }  #contrib-balance-g-140
@@ -236,16 +236,16 @@ ttrss_set_article_label <- function(base_url, session_id,
     })  #contrib-balance-g-202
     as.data.frame(scalars, stringsAsFactors = FALSE, check.names = FALSE)  #contrib-balance-g-203
   })  #contrib-balance-g-204
-  df <- dplyr::bind_rows(rows)  #contrib-balance-g-205
-  # Flatten any nested list/df columns that bind_rows may produce
-  for (col in names(df)) {
-    if (is.list(df[[col]]) || is.data.frame(df[[col]])) {
-      df[[col]] <- vapply(seq_len(nrow(df)), function(i) {
-        v <- df[[col]][[i]]
-        if (is.null(v) || length(v) == 0) NA_character_
-        else paste(unlist(v), collapse = "|")
-      }, character(1L))
-    }
-  }
-  df
+  df <- dplyr::bind_rows(rows)  #contrib-balance-g-205  #contrib-balance-v2-g-2
+  # Flatten any nested list/df columns that bind_rows may produce  #contrib-balance-v2-g-3
+  for (col in names(df)) {  #contrib-balance-v2-g-4
+    if (is.list(df[[col]]) || is.data.frame(df[[col]])) {  #contrib-balance-v2-g-5
+      df[[col]] <- vapply(seq_len(nrow(df)), function(i) {  #contrib-balance-v2-g-6
+        v <- df[[col]][[i]]  #contrib-balance-v2-g-7
+        if (is.null(v) || length(v) == 0) NA_character_  #contrib-balance-v2-g-8
+        else paste(unlist(v), collapse = "|")  #contrib-balance-v2-g-9
+      }, character(1L))  #contrib-balance-v2-g-10
+    }  #contrib-balance-v2-g-11
+  }  #contrib-balance-v2-g-12
+  df  #contrib-balance-v2-g-13
 }  #contrib-balance-g-206
