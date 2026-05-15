@@ -104,6 +104,10 @@ fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967
     replace   <- !is.na(looked_up) & nzchar(looked_up) & looked_up != "[Unknown]"  #contrib-balance-v2-a-16
     raw_df$feed_title[replace] <- looked_up[replace]  #contrib-balance-v2-a-17
   }  #contrib-balance-v2-a-18
+  if ("feed_title" %in% names(raw_df)) {
+    unknown <- !is.na(raw_df$feed_title) & raw_df$feed_title == "[Unknown]"
+    raw_df$feed_title[unknown] <- NA_character_
+  }
   #contrib-balance-k-1023
   .normalize_articles(raw_df)  #contrib-balance-k-1024
 }  #contrib-balance-k-1025

@@ -5,6 +5,12 @@ library(plotly)
 library(DT)
 library(ttrssR)
 
+.drop_unknown_feeds <- function(df) {
+  if (is.null(df) || !is.data.frame(df)) return(df)
+  if (!"feed_title" %in% names(df)) return(df)
+  df[is.na(df$feed_title) | df$feed_title != "[Unknown]", , drop = FALSE]
+}
+
 .initial_df <- local({
   candidates <- c(
     "data/news_raw.rds",
@@ -13,7 +19,8 @@ library(ttrssR)
   rds <- Find(file.exists, candidates)
   if (!is.null(rds)) {
     message("[APP] Loading: ", rds)
-    tryCatch(readRDS(rds), error = function(e) { message("[APP] Error: ", e$message); NULL })
+    df <- tryCatch(readRDS(rds), error = function(e) { message("[APP] Error: ", e$message); NULL })
+    .drop_unknown_feeds(df)
   } else {
     message("[APP] No data file found")
     NULL
@@ -66,7 +73,7 @@ server <- function(input, output, session) {
     df <- rv$df
     req(df)
     topics <- c("Все", sort(unique(df$topic_label[!is.na(df$topic_label) & nzchar(df$topic_label)])))
-    feeds  <- c("Все", sort(unique(df$feed_title[!is.na(df$feed_title)])))
+    feeds  <- c("Все", sort(unique(df$feed_title[!is.na(df$feed_title) & df$feed_title != "[Unknown]"])))
     updateSelectInput(session, "art_topic", choices = topics, selected = "Все")
     updateSelectInput(session, "art_feed",  choices = feeds,  selected = "Все")
   })
@@ -75,7 +82,7 @@ server <- function(input, output, session) {
     df <- rv$df
     req(df)
     topics <- c("Все", sort(unique(df$topic_label[!is.na(df$topic_label) & nzchar(df$topic_label)])))
-    feeds  <- c("Все", sort(unique(df$feed_title[!is.na(df$feed_title)])))
+    feeds  <- c("Все", sort(unique(df$feed_title[!is.na(df$feed_title) & df$feed_title != "[Unknown]"])))
     updateSelectInput(session, "art_topic", choices = topics, selected = "Все")
     updateSelectInput(session, "art_feed",  choices = feeds,  selected = "Все")
   })
@@ -84,14 +91,17 @@ server <- function(input, output, session) {
     .log("Запуск сбора…")
     withProgress(message = "Сбор новостей…", {
       tryCatch({
+        ttrss_url <- if (nzchar(Sys.getenv("TTRSS_URL"))) Sys.getenv("TTRSS_URL") else input$cfg_ttrss_url
+        ttrss_user <- if (nzchar(Sys.getenv("TTRSS_USER"))) Sys.getenv("TTRSS_USER") else input$cfg_ttrss_user
+        ttrss_pass <- if (nzchar(Sys.getenv("TTRSS_PASSWORD"))) Sys.getenv("TTRSS_PASSWORD") else input$cfg_ttrss_pass
         df <- fetch_news_dataframe(
-          base_url     = input$cfg_ttrss_url,
-          user         = input$cfg_ttrss_user,
-          password     = input$cfg_ttrss_pass,
+          base_url     = ttrss_url,
+          user         = ttrss_user,
+          password     = ttrss_pass,
           max_articles = input$cfg_max_articles
         )
-        rv$df <- df
-        .log("Собрано: ", nrow(df), " статей")
+        rv$df <- .drop_unknown_feeds(df)
+        .log("Собрано: ", nrow(rv$df), " статей")
       }, error = function(e) .log("Ошибка: ", conditionMessage(e)))
     })
   })
@@ -150,7 +160,7 @@ server <- function(input, output, session) {
           .log("! ", warn_msg)
           options(ttrssR.last_llm_warning = NULL)
         }
-        .log("Готово. Тем: ", length(unique(rv$df$topic_label)))
+        .log("Готово. Тем: ", length(unique(rv$df$topic_label[!is.na(rv$df$topic_label) & nzchar(rv$df$topic_label)])))
       }, error = function(e) .log("Ошибка: ", conditionMessage(e)))
     })
   })
@@ -158,6 +168,7 @@ server <- function(input, output, session) {
   filtered_df <- reactive({
     df <- rv$df
     req(df)
+    df <- .drop_unknown_feeds(df)
     if (!is.null(input$art_topic) && !("Все" %in% input$art_topic) && length(input$art_topic) > 0)
       df <- filter(df, topic_label %in% input$art_topic)
     if (!is.null(input$art_feed) && !("Все" %in% input$art_feed) && length(input$art_feed) > 0)
@@ -221,7 +232,7 @@ server <- function(input, output, session) {
     df <- rv$df
     req(df, "feed_title" %in% names(df))
     fc <- df |>
-      filter(!is.na(feed_title)) |>
+      filter(!is.na(feed_title), feed_title != "[Unknown]") |>
       count(feed_title, sort = TRUE) |>
       head(12)
     req(nrow(fc) > 0)
@@ -288,7 +299,7 @@ server <- function(input, output, session) {
     df <- rv$df
     req(df)
     df |>
-      filter(!is.na(feed_title)) |>
+      filter(!is.na(feed_title), feed_title != "[Unknown]") |>
       count(feed_title, name = "Статей") |>
       arrange(desc(Статей)) |>
       rename(Источник = feed_title) |>

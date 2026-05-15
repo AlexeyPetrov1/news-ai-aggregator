@@ -49,6 +49,10 @@ COPY docker/shiny-server.conf /etc/shiny-server/shiny-server.conf
 RUN mkdir -p /srv/shiny-server/ttrss/shiny/data \
     && chown -R shiny:shiny /srv/shiny-server
 
+# ── Entrypoint: пишет env-переменные в ~/.Renviron для shiny-user ─────────
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 3838
 
-CMD ["/usr/bin/shiny-server"]
+ENTRYPOINT ["/entrypoint.sh"]
