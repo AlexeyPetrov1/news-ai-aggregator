@@ -87,58 +87,58 @@ server <- function(input, output, session) {
     req(rv$df)
     .log("Классификация (", input$cfg_method, ")…")
     withProgress(message = "Классификация…", {
-      withCallingHandlers(
-        tryCatch({
-          yandex_api_key  <- trimws(if (is.null(input$cfg_yandex_api_key)) "" else input$cfg_yandex_api_key)
-          yandex_folder   <- trimws(if (is.null(input$cfg_yandex_folder)) "" else input$cfg_yandex_folder)
-          yandex_model    <- trimws(if (is.null(input$cfg_yandex_model)) "" else input$cfg_yandex_model)
-          yandex_base_url <- trimws(if (is.null(input$cfg_yandex_base_url)) "" else input$cfg_yandex_base_url)
-          llm_api_key     <- trimws(if (is.null(input$cfg_llm_api_key)) "" else input$cfg_llm_api_key)
-          llm_model       <- trimws(if (is.null(input$cfg_llm_model)) "" else input$cfg_llm_model)
-          llm_base_url    <- trimws(if (is.null(input$cfg_llm_base_url)) "" else input$cfg_llm_base_url)
-          llm_provider    <- if (is.null(input$cfg_llm_provider)) "openai" else input$cfg_llm_provider
+      tryCatch({
+        yandex_api_key  <- trimws(if (is.null(input$cfg_yandex_api_key)) "" else input$cfg_yandex_api_key)
+        yandex_folder   <- trimws(if (is.null(input$cfg_yandex_folder)) "" else input$cfg_yandex_folder)
+        yandex_model    <- trimws(if (is.null(input$cfg_yandex_model)) "" else input$cfg_yandex_model)
+        yandex_base_url <- trimws(if (is.null(input$cfg_yandex_base_url)) "" else input$cfg_yandex_base_url)
+        llm_api_key     <- trimws(if (is.null(input$cfg_llm_api_key)) "" else input$cfg_llm_api_key)
+        llm_model       <- trimws(if (is.null(input$cfg_llm_model)) "" else input$cfg_llm_model)
+        llm_base_url    <- trimws(if (is.null(input$cfg_llm_base_url)) "" else input$cfg_llm_base_url)
+        llm_provider    <- if (is.null(input$cfg_llm_provider)) "openai" else input$cfg_llm_provider
 
-          if (identical(input$cfg_method, "yandex_llm")) {
-            if (!nzchar(yandex_api_key)) {
-              .log("Ошибка: не задан Yandex API key.")
-              return(invisible(NULL))
-            }
-            if (!nzchar(yandex_folder)) {
-              .log("Ошибка: не задан Yandex folder id.")
-              return(invisible(NULL))
-            }
+        if (identical(input$cfg_method, "yandex_llm")) {
+          if (!nzchar(yandex_api_key)) {
+            .log("Ошибка: не задан Yandex API key.")
+            return(invisible(NULL))
           }
-
-          if (identical(input$cfg_method, "llm")) {
-            needs_key <- llm_provider %in% c("openai", "anthropic", "gemini")
-            if (needs_key && !nzchar(llm_api_key) &&
-                !nzchar(Sys.getenv("LLM_API_KEY", ""))) {
-              .log("Ошибка: не задан API Key (поле «API Key» или переменная LLM_API_KEY).")
-              return(invisible(NULL))
-            }
+          if (!nzchar(yandex_folder)) {
+            .log("Ошибка: не задан Yandex folder id.")
+            return(invisible(NULL))
           }
-
-          rv$df <- classify_news(
-            rv$df,
-            n_topics         = input$cfg_n_topics,
-            method           = input$cfg_method,
-            yandex_api_key   = if (nzchar(yandex_api_key)) yandex_api_key else NULL,
-            yandex_folder_id = if (nzchar(yandex_folder)) yandex_folder else NULL,
-            yandex_model     = if (nzchar(yandex_model)) yandex_model
-                               else Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
-            yandex_base_url  = if (nzchar(yandex_base_url)) yandex_base_url
-                               else Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
-            llm_provider     = llm_provider,
-            llm_api_key      = if (nzchar(llm_api_key)) llm_api_key else NULL,
-            llm_model        = if (nzchar(llm_model)) llm_model else NULL,
-            llm_base_url     = if (nzchar(llm_base_url)) llm_base_url else NULL
-          )
-          .log("Готово. Тем: ", length(unique(rv$df$topic_label)))
-        }, error = function(e) .log("Ошибка: ", conditionMessage(e))),
-        llm_partial_error = function(c) {
-          .log("! ", conditionMessage(c))
         }
-      )
+
+        if (identical(input$cfg_method, "llm")) {
+          needs_key <- llm_provider %in% c("openai", "anthropic", "gemini")
+          if (needs_key && !nzchar(llm_api_key) &&
+              !nzchar(Sys.getenv("LLM_API_KEY", ""))) {
+            .log("Ошибка: не задан API Key (поле «API Key» или переменная LLM_API_KEY).")
+            return(invisible(NULL))
+          }
+        }
+
+        rv$df <- classify_news(
+          rv$df,
+          n_topics         = input$cfg_n_topics,
+          method           = input$cfg_method,
+          yandex_api_key   = if (nzchar(yandex_api_key)) yandex_api_key else NULL,
+          yandex_folder_id = if (nzchar(yandex_folder)) yandex_folder else NULL,
+          yandex_model     = if (nzchar(yandex_model)) yandex_model
+                             else Sys.getenv("YANDEX_CLOUD_MODEL", "yandexgpt-5-lite/latest"),
+          yandex_base_url  = if (nzchar(yandex_base_url)) yandex_base_url
+                             else Sys.getenv("YANDEX_CLOUD_BASE_URL", "https://ai.api.cloud.yandex.net/v1"),
+          llm_provider     = llm_provider,
+          llm_api_key      = if (nzchar(llm_api_key)) llm_api_key else NULL,
+          llm_model        = if (nzchar(llm_model)) llm_model else NULL,
+          llm_base_url     = if (nzchar(llm_base_url)) llm_base_url else NULL
+        )
+        warn_msg <- getOption("ttrssR.last_llm_warning")
+        if (!is.null(warn_msg)) {
+          .log("! ", warn_msg)
+          options(ttrssR.last_llm_warning = NULL)
+        }
+        .log("Готово. Тем: ", length(unique(rv$df$topic_label)))
+      }, error = function(e) .log("Ошибка: ", conditionMessage(e)))
     })
   })
 

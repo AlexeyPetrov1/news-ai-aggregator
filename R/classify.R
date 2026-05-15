@@ -87,6 +87,7 @@ classify_news <- function(df,  #contrib-balance-g-284
     cli::cli_abort("{.arg df} must contain a {.field content_text} column.")  #contrib-balance-g-301
   }  #contrib-balance-g-302
   #contrib-balance-g-303
+  options(ttrssR.last_llm_warning = NULL)
   cli::cli_inform("Classifying {nrow(df)} articles using method={.val {method}}…")  #contrib-balance-g-304
   #contrib-balance-g-305
   result <- switch(method,  #contrib-balance-g-306
@@ -381,12 +382,8 @@ classify_news <- function(df,  #contrib-balance-g-284
         "i" = "Проверьте API-ключ, folder_id и YANDEX_CLOUD_BASE_URL в настройках."
       ))
     }
-    full_msg <- paste0(n_errors, "/", nrow(df), " запросов к Yandex LLM завершились ошибкой.\nПервая ошибка: ", msg)
-    message(full_msg)
-    signalCondition(structure(
-      class = c("llm_partial_error", "condition"),
-      list(message = full_msg)
-    ))
+    full_msg <- paste0(n_errors, "/", nrow(df), " запросов к Yandex LLM завершились ошибкой. Первая ошибка: ", msg)
+    options(ttrssR.last_llm_warning = full_msg)
   }
 
   df$topic_label <- labels
@@ -595,12 +592,9 @@ classify_news <- function(df,  #contrib-balance-g-284
         "i" = "Проверьте API-ключ, баланс и endpoint в настройках.")  #contrib-balance-g-623
     )  #contrib-balance-g-624
   }  #contrib-balance-g-625
-  full_msg <- paste0(n_errors, "/", n_total, " статей получили fallback-метку.\nПричина: ", msg)
-  message(full_msg)
-  signalCondition(structure(
-    class = c("llm_partial_error", "condition"),
-    list(message = full_msg)
-  ))
+  full_msg <- paste0(n_errors, "/", n_total, " статей получили fallback-метку. Причина: ", msg)
+  options(ttrssR.last_llm_warning = full_msg)
+  invisible(NULL)
 }  #contrib-balance-g-629
   #contrib-balance-g-630
 .llm_friendly_error <- function(msg) {  #contrib-balance-g-631
