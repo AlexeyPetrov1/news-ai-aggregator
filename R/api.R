@@ -134,7 +134,7 @@ ttrss_get_headlines <- function(base_url, session_id,  #contrib-balance-g-122
                               is_cat               = is_cat,  #contrib-balance-g-134
                               show_content         = TRUE,  #contrib-balance-g-135
                               include_attachments  = FALSE,  #contrib-balance-g-136
-                              order_by             = "date_reverse"))  #contrib-balance-g-137
+                              order_by             = "feed_dates"))  #contrib-balance-g-137
   if (length(content) == 0) return(data.frame())  #contrib-balance-g-138
   .rows_to_df(content)  #contrib-balance-g-139
 }  #contrib-balance-g-140

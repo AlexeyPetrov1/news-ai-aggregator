@@ -37,12 +37,9 @@ ui <- dashboardPage(
               plotlyOutput("plot_feeds_pie", height = "300px"))
         ),
         fluidRow(
-          box(title = "Динамика тем по неделям (топ-5)", width = 7,
+          box(title = "Публикации по дням", width = 12,
               status = "primary", solidHeader = TRUE,
-              plotlyOutput("plot_topic_trend", height = "340px")),
-          box(title = "Малые темы (наименее популярные)", width = 5,
-              status = "success", solidHeader = TRUE,
-              plotlyOutput("plot_rare_topics", height = "340px"))
+              plotlyOutput("plot_daily", height = "380px"))
         )
       ),
 

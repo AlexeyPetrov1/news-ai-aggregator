@@ -31,16 +31,29 @@ server <- function(input, output, session) {
   # Сокращает LDA-метки "Тема N: слово1, слово2, ..." → "#N слово1 · слово2"
   # Остальные метки обрезает до 28 символов с "…" если длиннее
   shorten_lda_label <- function(lbl) {
+    # HTML-сущности которые не несут смысла в метках тем
+    html_junk <- c("mdash","ndash","laquo","raquo","rsquo","lsquo",
+                   "ldquo","rdquo","nbsp","amp","quot","apos","hellip",
+                   "images","photos","said","also","that","this","with",
+                   "from","have","been","they","their","were","will")
     is_lda <- grepl("^Тема \\d+: ", lbl, perl = TRUE)
     out    <- lbl
     if (any(is_lda)) {
       nums  <- regmatches(lbl[is_lda], regexpr("\\d+", lbl[is_lda]))
       tstr  <- sub("^Тема \\d+: ", "", lbl[is_lda])
-      terms <- lapply(strsplit(tstr, ",\\s*"), function(x) head(trimws(x), 2))
-      out[is_lda] <- paste0("#", nums, " ", vapply(terms, paste, "", collapse = " · "))
+      terms <- lapply(strsplit(tstr, ",\\s*"), function(x) {
+        words <- trimws(x)
+        words <- words[!tolower(words) %in% html_junk & nchar(words) > 2]
+        head(words, 3)
+      })
+      labels <- vapply(terms, function(w) {
+        if (length(w) == 0) return("—")
+        paste(w, collapse = " · ")
+      }, character(1))
+      out[is_lda] <- paste0("#", nums, ": ", labels)
     }
-    long <- !is_lda & nchar(out) > 28
-    out[long] <- paste0(substr(out[long], 1, 25), "…")
+    long <- !is_lda & nchar(out) > 30
+    out[long] <- paste0(substr(out[long], 1, 27), "…")
     out
   }
 
@@ -221,77 +234,36 @@ server <- function(input, output, session) {
              margin = list(l = 40, r = 20, t = 10, b = 130))
   })
 
-  output$plot_topic_trend <- renderPlotly({
+  output$plot_daily <- renderPlotly({
     df <- rv$df
     req(df, "published_at" %in% names(df), "topic_label" %in% names(df))
 
-    top_topics <- df |>
-      filter(!is.na(topic_label), nzchar(topic_label), topic_label != "Other") |>
-      count(topic_label, sort = TRUE) |>
-      slice_head(n = 5) |>
-      pull(topic_label)
-
-    trend <- df |>
-      mutate(
-        day  = as.Date(as.character(published_at)),
-        week = as.Date(cut(day, breaks = "week"))
-      ) |>
+    daily <- df |>
+      mutate(day = as.Date(as.character(published_at))) |>
       filter(!is.na(day), !is.na(topic_label), nzchar(topic_label), topic_label != "Other") |>
-      mutate(
-        grp   = if_else(topic_label %in% top_topics, topic_label, "Прочие темы"),
-        label = shorten_lda_label(grp)
-      ) |>
-      count(week, label) |>
-      arrange(week)
+      mutate(label = shorten_lda_label(topic_label)) |>
+      count(day, label) |>
+      arrange(day)
 
-    req(nrow(trend) > 0)
+    req(nrow(daily) > 0)
     plot_ly(
-      trend,
-      x          = ~week,
-      y          = ~n,
-      color      = ~label,
-      colors     = "Set2",
-      type       = "scatter",
-      mode       = "lines",
-      stackgroup = "one",
+      daily,
+      x             = ~day,
+      y             = ~n,
+      color         = ~label,
+      colors        = "Set2",
+      type          = "bar",
       hovertemplate = "<b>%{fullData.name}</b><br>%{x|%d %b %Y}: %{y} ст.<extra></extra>"
     ) |>
       layout(
-        xaxis  = list(title = ""),
-        yaxis  = list(title = "Статей за неделю"),
-        legend = list(
+        barmode = "stack",
+        xaxis   = list(title = ""),
+        yaxis   = list(title = "Статей за день"),
+        legend  = list(
           orientation = "v", x = 1.02, y = 0.5,
           xanchor = "left", font = list(size = 11)
         ),
-        margin = list(l = 50, r = 160, t = 10, b = 40)
-      )
-  })
-
-  output$plot_rare_topics <- renderPlotly({
-    df <- rv$df
-    req(df, "topic_label" %in% names(df))
-
-    rare <- df |>
-      filter(!is.na(topic_label), nzchar(topic_label), topic_label != "Other") |>
-      count(topic_label, sort = FALSE) |>
-      arrange(n) |>
-      slice_head(n = 8) |>
-      mutate(label = shorten_lda_label(topic_label))
-
-    req(nrow(rare) > 0)
-    plot_ly(
-      rare,
-      x           = ~n,
-      y           = ~reorder(label, n),
-      type        = "bar",
-      orientation = "h",
-      marker      = list(color = "#00c0ef"),
-      hovertemplate = "<b>%{y}</b><br>%{x} статей<extra></extra>"
-    ) |>
-      layout(
-        xaxis  = list(title = "Количество статей"),
-        yaxis  = list(title = ""),
-        margin = list(l = 160, r = 20, t = 10, b = 50)
+        margin  = list(l = 50, r = 160, t = 10, b = 40)
       )
   })
 

@@ -30,6 +30,15 @@ fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967
   #contrib-balance-k-973
   sid <- ttrss_login(base_url, user, password)  #contrib-balance-k-974
   on.exit(ttrss_logout(base_url, sid), add = TRUE)  #contrib-balance-k-975
+
+  # Build feed_id -> title lookup from TT-RSS (getFeeds returns real titles)
+  feeds_raw <- tryCatch(ttrss_get_feeds(base_url, sid), error = function(e) NULL)
+  feed_lookup <- if (!is.null(feeds_raw) && "id" %in% names(feeds_raw) &&
+                       "title" %in% names(feeds_raw)) {
+    setNames(as.character(feeds_raw$title), as.character(feeds_raw$id))
+  } else {
+    character(0)
+  }
   #contrib-balance-k-976
   batch_size <- min(as.integer(batch_size), 200L)  #contrib-balance-k-977
   collected  <- list()  #contrib-balance-k-978
@@ -77,6 +86,13 @@ fetch_news_dataframe <- function(base_url,  #contrib-balance-k-967
   #contrib-balance-k-1020
   raw_df <- dplyr::bind_rows(collected)  #contrib-balance-k-1021
   cli::cli_inform("Fetched {nrow(raw_df)} articles. Normalising…")  #contrib-balance-k-1022
+
+  # Patch feed_title from lookup: always use real feed title from TT-RSS
+  if (length(feed_lookup) > 0 && "feed_id" %in% names(raw_df)) {
+    looked_up <- unname(feed_lookup[as.character(raw_df$feed_id)])
+    replace   <- !is.na(looked_up) & nzchar(looked_up) & looked_up != "[Unknown]"
+    raw_df$feed_title[replace] <- looked_up[replace]
+  }
   #contrib-balance-k-1023
   .normalize_articles(raw_df)  #contrib-balance-k-1024
 }  #contrib-balance-k-1025

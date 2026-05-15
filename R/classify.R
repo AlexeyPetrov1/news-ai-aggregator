@@ -154,7 +154,7 @@ classify_news <- function(df,  #contrib-balance-g-284
   #contrib-balance-g-352
   k   <- min(as.integer(n_topics), nrow(dtm) - 1L)  #contrib-balance-g-353
   lda <- topicmodels::LDA(dtm, k = k,  #contrib-balance-g-354
-                          control = list(seed = 42L, verbose = 0L))  #contrib-balance-g-355
+                          control = list(seed = 42L, verbose = 0L, iter = 200L, burnin = 50L))  #contrib-balance-g-355
   #contrib-balance-g-356
   # Per-document dominant topic  #contrib-balance-g-357
   gamma_df <- tidytext::tidy(lda, matrix = "gamma") |>  #contrib-balance-g-358
@@ -414,95 +414,48 @@ classify_news <- function(df,  #contrib-balance-g-284
   api_key   <- api_key  %||% Sys.getenv("LLM_API_KEY", "")  #contrib-balance-g-465
   model     <- model    %||% ""  #contrib-balance-g-466
   base_url  <- base_url %||% ""  #contrib-balance-g-467
-  #contrib-balance-g-468
-  # OpenAI и все OpenAI-совместимые: используем httr2 напрямую  #contrib-balance-g-469
-  if (provider == "openai") {  #contrib-balance-g-470
-    return(.classify_openai_compat(df, api_key, model, base_url,  #contrib-balance-g-471
-                                   allowed_topics, unknown_label))  #contrib-balance-g-472
-  }  #contrib-balance-g-473
-  #contrib-balance-g-474
-  # Остальные провайдеры — через ellmer  #contrib-balance-g-475
-  topics_list <- paste(allowed_topics, collapse = "\n")  #contrib-balance-g-477
-  system_prompt <- paste0(  #contrib-balance-g-478
-    "You are a cybersecurity news classifier. ",
-    "Read the article and output EXACTLY ONE label from the list below. ",
-    "Output the label text only — no explanation, no punctuation, no extra words, one line.\n\n",
-    "Labels:\n",  #contrib-balance-g-480
-    topics_list, "\n\n",  #contrib-balance-g-481
-    "If the article does not perfectly match one label, pick the CLOSEST one. ",
-    "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",
-    "Respond in English. One line. Exact label text only."
-  )  #contrib-balance-g-486
-  #contrib-balance-g-487
-  make_chat <- function() {  #contrib-balance-g-488
-    switch(provider,  #contrib-balance-g-489
-      anthropic = ellmer::chat_anthropic(  #contrib-balance-g-490
-        system_prompt = system_prompt,  #contrib-balance-g-491
-        api_key       = api_key,  #contrib-balance-g-492
-        model         = if (nzchar(model)) model else "claude-3-5-haiku-latest"  #contrib-balance-g-493
-      ),  #contrib-balance-g-494
-      gemini    = ellmer::chat_google_gemini(  #contrib-balance-g-495
-        system_prompt = system_prompt,  #contrib-balance-g-496
-        api_key       = api_key,  #contrib-balance-g-497
-        model         = if (nzchar(model)) model else "gemini-1.5-flash"  #contrib-balance-g-498
-      ),  #contrib-balance-g-499
-      ollama    = ellmer::chat_ollama(  #contrib-balance-g-500
-        system_prompt = system_prompt,  #contrib-balance-g-501
-        model         = if (nzchar(model)) model else "llama3.2",  #contrib-balance-g-502
-        base_url      = if (nzchar(base_url)) base_url else "http://localhost:11434"  #contrib-balance-g-503
-      )  #contrib-balance-g-504
-    )  #contrib-balance-g-505
-  }  #contrib-balance-g-506
-  #contrib-balance-g-507
-  first_err <- NULL  #contrib-balance-g-508
-  n_errors  <- 0L  #contrib-balance-g-509
-  #contrib-balance-g-510
-  labels <- vapply(seq_len(nrow(df)), function(i) {  #contrib-balance-g-511
-    text <- substr(  #contrib-balance-g-512
-      paste(df$title[i] %||% "", df$content_text[i] %||% ""),  #contrib-balance-g-513
-      1L, 1200L  #contrib-balance-g-514
-    )  #contrib-balance-g-515
-    label   <- unknown_label
-    api_err <- NULL
-    for (attempt in seq_len(3L)) {
-      Sys.sleep(0.5)  # rate limit между запросами
-      result <- tryCatch(
-        .normalize_topic_label(make_chat()$chat(text), allowed_topics, unknown_label),
-        error = function(e) e
-      )
-      if (!inherits(result, "error")) { label <- result; break }
-      api_err <- conditionMessage(result)
-      if (attempt < 3L) Sys.sleep(2 ^ (attempt - 1L))  # backoff: 1s, 2s
-    }
-    if (!is.null(api_err)) {
-      n_errors  <<- n_errors + 1L
-      if (is.null(first_err)) first_err <<- .llm_friendly_error(api_err)
-    }
-    label
-  }, character(1L))  #contrib-balance-g-524
-  #contrib-balance-g-525
-  .llm_check_errors(n_errors, nrow(df), first_err)  #contrib-balance-g-526
-  #contrib-balance-g-527
-  df$topic_label <- labels  #contrib-balance-g-528
-  df$topic       <- as.integer(factor(labels, levels = allowed_topics))  #contrib-balance-g-529
-  df  #contrib-balance-g-530
+
+  # Все провайдеры маршрутизируем через httr2 параллельно —
+  # anthropic/gemini/ollama конвертируем в OpenAI-совместимый формат
+  resolved <- switch(provider,
+    openai = list(
+      url   = if (nzchar(base_url)) base_url else "https://api.openai.com",
+      model = if (nzchar(model)) model else "gpt-4o-mini",
+      key   = api_key
+    ),
+    anthropic = list(
+      url   = "https://api.anthropic.com/v1",
+      model = if (nzchar(model)) model else "claude-haiku-4-5-20251001",
+      key   = api_key
+    ),
+    gemini = list(
+      url   = paste0("https://generativelanguage.googleapis.com/v1beta/openai"),
+      model = if (nzchar(model)) model else "gemini-2.0-flash",
+      key   = api_key
+    ),
+    ollama = list(
+      url   = if (nzchar(base_url)) base_url else "http://localhost:11434/v1",
+      model = if (nzchar(model)) model else "llama3.2",
+      key   = "ollama"
+    )
+  )
+
+  .classify_openai_compat(df, resolved$key, resolved$model, resolved$url,
+                          allowed_topics, unknown_label)
 }  #contrib-balance-g-531
   #contrib-balance-g-532
 # Прямой вызов через httr2 для OpenAI и любых совместимых API  #contrib-balance-g-533
+# Запросы отправляются параллельно пакетами по BATCH_SIZE штук —
+# это в ~20x быстрее последовательного варианта с Sys.sleep(0.5).
 .classify_openai_compat <- function(df, api_key, model, base_url,  #contrib-balance-g-534
-                                    allowed_topics, unknown_label) {  #contrib-balance-g-535
-  # Нормализуем base URL по соглашению OpenAI SDK:  #contrib-balance-g-536
-  # конечная точка всегда <base>/v1/chat/completions.  #contrib-balance-g-537
-  # Если пользователь вставил https://api.deepseek.com (как в документации DeepSeek),  #contrib-balance-g-538
-  # автоматически добавляем /v1 — не нужно помнить, что именно вводить.  #contrib-balance-g-539
+                                    allowed_topics, unknown_label,
+                                    batch_size = 20L) {  #contrib-balance-g-535
   raw_url <- if (nzchar(base_url %||% "")) sub("/+$", "", base_url)  #contrib-balance-g-540
              else "https://api.openai.com"  #contrib-balance-g-541
   effective_url   <- if (grepl("/v1$", raw_url)) raw_url else paste0(raw_url, "/v1")  #contrib-balance-g-542
   effective_model <- if (nzchar(model %||% "")) model else "gpt-4o-mini"  #contrib-balance-g-543
   endpoint        <- paste0(effective_url, "/chat/completions")  #contrib-balance-g-544
-  #contrib-balance-g-545
-  # Plain list without numbers: numbering caused models to echo "1. Malware"
-  # instead of "Malware", breaking exact-match normalization.
+
   topics_list <- paste(allowed_topics, collapse = "\n")  #contrib-balance-g-547
   system_msg <- paste0(  #contrib-balance-g-548
     "You are a cybersecurity news classifier. ",
@@ -514,75 +467,86 @@ classify_news <- function(df,  #contrib-balance-g-284
     "Use 'Other' ONLY if the article has absolutely no connection to cybersecurity. ",
     "Respond in English. One line. Exact label text only."
   )  #contrib-balance-g-556
-  #contrib-balance-g-557
-  first_err <- NULL  #contrib-balance-g-558
-  n_errors  <- 0L  #contrib-balance-g-559
-  #contrib-balance-g-560
-  labels <- vapply(seq_len(nrow(df)), function(i) {  #contrib-balance-g-561
-    text <- substr(  #contrib-balance-g-562
-      paste(df$title[i] %||% "", df$content_text[i] %||% ""),  #contrib-balance-g-563
-      1L, 1200L  #contrib-balance-g-564
-    )  #contrib-balance-g-565
-    body <- list(  #contrib-balance-g-566
-      model    = effective_model,  #contrib-balance-g-567
-      messages = list(  #contrib-balance-g-568
-        list(role = "system", content = system_msg),  #contrib-balance-g-569
-        list(role = "user",   content = text)  #contrib-balance-g-570
-      ),  #contrib-balance-g-571
-      max_tokens  = 80L,  #contrib-balance-g-572
-      temperature = 0  #contrib-balance-g-573
-    )  #contrib-balance-g-574
-    label   <- unknown_label
-    api_err <- NULL
-    for (attempt in seq_len(3L)) {
-      Sys.sleep(0.5)  # rate limit между запросами
-      resp <- tryCatch(
-        httr2::request(endpoint) |>
-          httr2::req_headers(
-            "Authorization" = paste("Bearer", api_key),
-            "Content-Type"  = "application/json"
-          ) |>
-          httr2::req_body_json(body, auto_unbox = TRUE) |>
-          httr2::req_error(is_error = \(r) FALSE) |>
-          httr2::req_perform(),
-        error = function(e) e
-      )
-      if (inherits(resp, "error")) {
-        api_err <- conditionMessage(resp)
-        if (attempt < 3L) next else break
-      }
-      status <- httr2::resp_status(resp)
-      if ((status == 429L || status >= 500L) && attempt < 3L) {
-        Sys.sleep(2 ^ (attempt - 1L))  # backoff: 1s, 2s
-        next
-      }
-      parsed <- tryCatch(
-        httr2::resp_body_json(resp, simplifyVector = FALSE),
-        error = function(e) NULL
-      )
-      if (status != 200L) {
+
+  n      <- nrow(df)
+  labels <- character(n)
+
+  .make_req <- function(i) {
+    text <- substr(paste(df$title[i] %||% "", df$content_text[i] %||% ""), 1L, 1200L)
+    body <- list(
+      model    = effective_model,
+      messages = list(
+        list(role = "system", content = system_msg),
+        list(role = "user",   content = text)
+      ),
+      max_tokens  = 80L,
+      temperature = 0
+    )
+    httr2::request(endpoint) |>
+      httr2::req_headers(
+        "Authorization" = paste("Bearer", api_key),
+        "Content-Type"  = "application/json"
+      ) |>
+      httr2::req_body_json(body, auto_unbox = TRUE) |>
+      httr2::req_error(is_error = \(r) FALSE)
+  }
+
+  .parse_resp <- function(resp, i, first_err, n_errors) {
+    if (is.null(resp) || inherits(resp, "error")) {
+      n_errors <<- n_errors + 1L
+      if (is.null(first_err))
+        first_err <<- paste0(.llm_friendly_error(conditionMessage(resp %||% simpleError("network error"))),
+                             "\n  endpoint: ", endpoint, "\n  model: ", effective_model)
+      return(unknown_label)
+    }
+    status <- httr2::resp_status(resp)
+    parsed <- tryCatch(httr2::resp_body_json(resp, simplifyVector = FALSE), error = function(e) NULL)
+    if (status != 200L) {
+      n_errors <<- n_errors + 1L
+      if (is.null(first_err)) {
         api_err <- if (is.list(parsed))
           parsed$error$message %||% parsed$message %||% paste("HTTP", status)
         else paste("HTTP", status)
-        break
-      }
-      raw   <- parsed$choices[[1L]]$message$content %||% ""
-      label <- .normalize_topic_label(raw, allowed_topics, unknown_label)
-      api_err <- NULL
-      break
-    }
-    if (!is.null(api_err)) {
-      n_errors <<- n_errors + 1L
-      if (is.null(first_err))
         first_err <<- paste0(.llm_friendly_error(api_err),
-                             "\n  endpoint: ", endpoint,
-                             "\n  model: ", effective_model)
+                             "\n  endpoint: ", endpoint, "\n  model: ", effective_model)
+      }
+      return(unknown_label)
     }
-    label
-  }, character(1L))  #contrib-balance-g-609
-  #contrib-balance-g-610
-  .llm_check_errors(n_errors, nrow(df), first_err)  #contrib-balance-g-611
-  #contrib-balance-g-612
+    raw <- parsed$choices[[1L]]$message$content %||% ""
+    .normalize_topic_label(raw, allowed_topics, unknown_label)
+  }
+
+  first_err <- NULL
+  n_errors  <- 0L
+
+  batches <- split(seq_len(n), ceiling(seq_len(n) / batch_size))
+  for (b_idx in seq_along(batches)) {
+    idx   <- batches[[b_idx]]
+    reqs  <- lapply(idx, .make_req)
+    resps <- httr2::req_perform_parallel(reqs, on_error = "continue")
+
+    # Retry каждый 429 из пакета с экспоненциальным backoff
+    retry_delay <- 2
+    for (attempt in seq_len(4L)) {
+      retry_idx <- which(vapply(resps, function(r) {
+        !is.null(r) && !inherits(r, "error") && httr2::resp_status(r) == 429L
+      }, logical(1L)))
+      if (!length(retry_idx)) break
+      Sys.sleep(retry_delay)
+      retry_delay <- retry_delay * 2
+      retry_resps <- httr2::req_perform_parallel(reqs[retry_idx], on_error = "continue")
+      for (k in seq_along(retry_idx)) resps[[retry_idx[k]]] <- retry_resps[[k]]
+    }
+
+    for (j in seq_along(idx)) {
+      labels[idx[j]] <- .parse_resp(resps[[j]], idx[j], first_err, n_errors)
+    }
+    # Пауза между пакетами чтобы не превысить rate limit
+    if (b_idx < length(batches)) Sys.sleep(1)
+  }
+
+  .llm_check_errors(n_errors, n, first_err)  #contrib-balance-g-611
+
   df$topic_label <- labels  #contrib-balance-g-613
   df$topic       <- as.integer(factor(labels, levels = allowed_topics))  #contrib-balance-g-614
   df  #contrib-balance-g-615

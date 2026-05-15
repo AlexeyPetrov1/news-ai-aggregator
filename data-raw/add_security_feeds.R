@@ -24,20 +24,17 @@ feeds <- list(
   # Новости ИБ — русскоязычные СМИ
   "ИБ-новости (RU)" = c(
     "https://www.anti-malware.ru/rss.xml",
-    "https://www.securitylab.ru/rss/",
-    "https://xakep.ru/feed/",
-    "https://cisoclub.ru/feed/"
+    "https://xakep.ru/feed/"
   ),
 
   # Профессиональное сообщество (RU)
   "Сообщество (RU)" = c(
-    "https://habr.com/ru/rss/hub/information_security/articles/",
-    "https://habr.com/ru/rss/hub/netsecurity/articles/"
+    "https://habr.com/ru/rss/hubs/infosecurity/articles/",
+    "https://www.opennet.ru/opennews/opennews_all_noadv.rss"
   ),
 
   # CERT / Регуляторы (RU)
   "CERT / Регуляторы (RU)" = c(
-    "https://bdu.fstec.ru/news/rss",
     "https://safe-surf.ru/rss/"
   ),
 
