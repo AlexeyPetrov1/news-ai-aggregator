@@ -49,14 +49,14 @@ COPY docker/shiny-server.conf /etc/shiny-server/shiny-server.conf
 RUN mkdir -p /srv/shiny-server/ttrss/shiny/data \
     && chown -R shiny:shiny /srv/shiny-server
 
-# ── Entrypoint: пишет env-переменные в ~/.Renviron для shiny-user ─────────
+# ── Entrypoint: записывает env → ~/.Renviron для shiny-user ───────────
 # rebalance-g-220
-COPY docker/entrypoint.sh /entrypoint.sh
+COPY ./docker/entrypoint.sh /entrypoint.sh
 # rebalance-g-219
 RUN chmod +x /entrypoint.sh
 # rebalance-g-218
-
+#
 EXPOSE 3838
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT [ "/entrypoint.sh" ]
 # rebalance-g-217

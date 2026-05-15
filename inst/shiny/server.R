@@ -10,7 +10,7 @@ library(ttrssR)  # cb-g
   if (!"feed_title" %in% names(df)) return(df)  #cb-g-180
   df[is.na(df$feed_title) | df$feed_title != "[Unknown]", , drop = FALSE]  #cb-g-181
 }  #cb-g-182
-
+#
 .initial_df <- local({  # cb-g
   candidates <- c(  # cb-g
     "data/news_raw.rds",  # cb-g

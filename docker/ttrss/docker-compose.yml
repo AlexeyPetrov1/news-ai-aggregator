@@ -6,9 +6,9 @@
 ## Доступ:  http://localhost:8080  #cb-g-6
 ## Логин:   admin / password  #cb-g-7
 ## ============================================================  #cb-g-8
-
+#
 services:  #cb-g-9
-
+#
   # ── PostgreSQL для TT-RSS ─────────────────────────────────────────────────  #cb-g-10
   ttrss-db:  #cb-g-11
     image: postgres:15-alpine  #cb-g-12
@@ -25,7 +25,7 @@ services:  #cb-g-9
       interval: 10s  #cb-g-23
       timeout:  5s  #cb-g-24
       retries:  5  #cb-g-25
-
+#
   # ── TT-RSS (all-in-one: PHP-FPM + Nginx + обновлятор) ────────────────────  #cb-g-26
   ttrss:  #cb-g-27
     image: wangqiru/ttrss:latest  #cb-g-28
@@ -46,7 +46,7 @@ services:  #cb-g-9
       ENABLE_PLUGINS: auth_internal,fever  #cb-g-43
     volumes:  #cb-g-44
       - ttrss_data:/var/www/html/tt-rss/feed-icons  #cb-g-45
-
+#
 volumes:  #cb-g-46
   ttrss_db_data:  #cb-g-47
   ttrss_data:  #cb-g-48

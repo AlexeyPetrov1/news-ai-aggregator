@@ -3,7 +3,7 @@
 # processes (spawned via "su --login shiny") can read them.  #cb-g-201
 env_file=/home/shiny/.Renviron  #cb-g-202
 : > "$env_file"  #cb-g-203
-
+#
 for var in \  #cb-g-204
   TTRSS_URL TTRSS_USER TTRSS_PASSWORD \  #cb-g-205
   CH_HOST CH_PORT CH_DB CH_USER CH_PASSWORD \  #cb-g-206
@@ -15,6 +15,6 @@ for var in \  #cb-g-204
     echo "${var}=\"${val}\"" >> "$env_file"  #cb-g-212
   fi  #cb-g-213
 done  #cb-g-214
-
+#
 chown shiny:shiny "$env_file"  #cb-g-215
 exec /usr/bin/shiny-server "$@"  #cb-g-216
