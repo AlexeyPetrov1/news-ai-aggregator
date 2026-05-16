@@ -1,4 +1,4 @@
-# news-ai-aggregator 
+﻿# news-ai-aggregator 
 
 `news-ai-aggregator` — R-based ETL/ML/NLP-пайплайн для сбора, тематической классификации и аналитики новостей по кибербезопасности. 
 
@@ -292,29 +292,46 @@ YANDEX_CACHE_PATH=data/yandex_llm_cache.rds
 - R локально нужен только для ручного запуска и разработки; 
 - активный доступ к Yandex Cloud / AI Studio нужен только для `CLASSIFY_METHOD=yandex_llm`. 
  
-### 9.2. Клонирование 
+### 9.2. Запуск
 
-```bash
-git clone https://github.com/AlexeyPetrov1/news-ai-aggregator.git 
-cd news-ai-aggregator 
-```
-
-### 9.3. Подготовка `.env` 
-
-В корне репозитория лежит **`.env.example`** — готовый шаблон для Docker Compose. Скопируйте его в `.env` и при необходимости отредактируйте:
+Скачайте `docker-compose.yml` и запустите стек одной командой:
 
 **Linux / macOS:**
 
-```bash 
-cp .env.example .env 
-``` 
+```bash
+curl -O https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/docker-compose.yml
+docker compose up -d
+```
 
 **Windows (PowerShell):**
- 
+
 ```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/docker-compose.yml" -OutFile "docker-compose.yml"
+docker compose up -d
+```
+
+Все образы подтянутся автоматически с `ghcr.io` — клонировать репозиторий не нужно.
+
+> Если хотите изменить порты, пароли или метод классификации — создайте `.env` рядом с `docker-compose.yml` (см. [раздел 9.3](#93-настройка-env-опционально)). Без `.env` используются значения по умолчанию.
+
+### 9.3. Настройка `.env` (опционально)
+
+Нужен только если хотите изменить настройки по умолчанию. Скачайте шаблон:
+
+**Linux / macOS:**
+
+```bash
+curl -O https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/.env.example
+cp .env.example .env
+```
+
+**Windows (PowerShell):**
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/.env.example" -OutFile ".env.example"
 Copy-Item .env.example .env
-``` 
- 
+```
+
 Минимально проверьте в `.env` (значения уже заданы в шаблоне, обычно достаточно для первого запуска с `lda`):
 
 - `TTRSS_ADMIN_USER` / `TTRSS_ADMIN_PASSWORD` — учётные данные TT-RSS;
@@ -325,11 +342,9 @@ Copy-Item .env.example .env
 - `N_TOPICS` — количество тем (для LDA / K-Means).
 
 > Файл `.env` содержит секреты — не коммитьте его в репозиторий.
- 
+
 Полная пошаговая инструкция по каждой переменной — в **[разделе 9.4](#94-подробная-инструкция-по-созданию-env)**.
- 
---- 
- 
+
 ### 9.4. Подробная инструкция по созданию `.env`
 
 #### Шаг 1. Создать `.env` из шаблона
@@ -508,13 +523,13 @@ RUN_ADD_FEEDS_EACH_CYCLE=false
 
 ## 10. Запуск Docker-образа
  
-Убедитесь, что **Docker Desktop** установлен и запущен, `.env` заполнен (см. [раздел 9.3–9.4](#93-подготовка-env)), затем из корня репозитория:
+Убедитесь, что **Docker Desktop** установлен и запущен, затем:
  
 ```bash 
-docker compose up -d --build
+docker compose up -d
 ``` 
 
-Эта одна команда собирает образы и запускает весь стек: TT-RSS, PostgreSQL, ClickHouse, scheduler, Shiny и MCP.
+Эта команда запускает весь стек: TT-RSS, PostgreSQL, ClickHouse, scheduler, Shiny и MCP. Образы подтянутся с `ghcr.io` автоматически.
 
 ### Проверка контейнеров
  
@@ -553,7 +568,7 @@ admin / password
 docker compose down
 
 # пересобрать после изменений кода
-docker compose up -d --build
+docker compose up -d
 ```
 
 
@@ -714,7 +729,7 @@ FROM articles FINAL<!-- cb-k-100 -->
 Запуск полного стека:<!-- cb-k-110 -->
 
 ```bash<!-- cb-k-111 -->
-docker compose up -d --build<!-- cb-k-112 -->
+docker compose up -d<!-- cb-k-112 -->
 ```<!-- cb-k-113 -->
 
 Открыть dashboard:<!-- cb-k-114 -->
@@ -1087,7 +1102,7 @@ docker logs -f ttrss-mcp
 Если endpoint недоступен, убедитесь, что полный стек запущен:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 ---
