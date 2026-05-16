@@ -168,6 +168,7 @@ services:
   # ── Scheduler (periodic fetch + write to ClickHouse) ─────────────────────
   scheduler:
     image: ghcr.io/alexeypetrov1/ttrssr-shiny:latest
+    entrypoint: []
     container_name: ttrss-scheduler
     restart: unless-stopped
     working_dir: /pkg/ttrssR
