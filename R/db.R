@@ -35,49 +35,49 @@ ch_connect <- function(host     = Sys.getenv("CH_HOST",     "localhost"),  #cont
 #' @return \code{TRUE} invisibly.  #contrib-balance-g-741
 #' @export  #contrib-balance-g-742
 ch_init_schema <- function(con) {  #contrib-balance-g-743
-  DBI::dbExecute(con, "  #contrib-balance-g-744
-    CREATE TABLE IF NOT EXISTS articles (  #contrib-balance-g-745
-      article_id    UInt64        COMMENT 'TT-RSS article ID',  #contrib-balance-g-746
-      title         String        COMMENT 'Article title',  #contrib-balance-g-747
-      content       String        COMMENT 'Raw HTML content',  #contrib-balance-g-748
-      content_text  String        COMMENT 'Plain text (stripped HTML)',  #contrib-balance-g-749
-      link          String        COMMENT 'Source URL',  #contrib-balance-g-750
-      feed_id       UInt32        COMMENT 'TT-RSS feed ID',  #contrib-balance-g-751
-      feed_title    String        COMMENT 'Feed name',  #contrib-balance-g-752
-      author        String,  #contrib-balance-g-753
-      published_at  DateTime      COMMENT 'Original publication timestamp (UTC)',  #contrib-balance-g-754
-      fetched_at    DateTime      COMMENT 'When we fetched it',  #contrib-balance-g-755
-      is_unread     UInt8,  #contrib-balance-g-756
-      is_starred    UInt8,  #contrib-balance-g-757
-      topic         UInt32        DEFAULT 0,  #contrib-balance-g-758
-      topic_label   String        DEFAULT '',  #contrib-balance-g-759
-      topic_prob    Float32       DEFAULT 0  #contrib-balance-g-760
-    ) ENGINE = ReplacingMergeTree(fetched_at)  #contrib-balance-g-761
-    ORDER BY (published_at, article_id)  #contrib-balance-g-762
-    PARTITION BY toYYYYMM(published_at)  #contrib-balance-g-763
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS articles (
+      article_id    UInt64        COMMENT 'TT-RSS article ID',
+      title         String        COMMENT 'Article title',
+      content       String        COMMENT 'Raw HTML content',
+      content_text  String        COMMENT 'Plain text (stripped HTML)',
+      link          String        COMMENT 'Source URL',
+      feed_id       UInt32        COMMENT 'TT-RSS feed ID',
+      feed_title    String        COMMENT 'Feed name',
+      author        String,
+      published_at  DateTime      COMMENT 'Original publication timestamp (UTC)',
+      fetched_at    DateTime      COMMENT 'When we fetched it',
+      is_unread     UInt8,
+      is_starred    UInt8,
+      topic         UInt32        DEFAULT 0,
+      topic_label   String        DEFAULT '',
+      topic_prob    Float32       DEFAULT 0
+    ) ENGINE = ReplacingMergeTree(fetched_at)
+    ORDER BY (published_at, article_id)
+    PARTITION BY toYYYYMM(published_at)
   ")  #contrib-balance-g-764
   #contrib-balance-g-765
-  DBI::dbExecute(con, "  #contrib-balance-g-766
-    CREATE TABLE IF NOT EXISTS feeds (  #contrib-balance-g-767
-      feed_id    UInt32,  #contrib-balance-g-768
-      title      String,  #contrib-balance-g-769
-      feed_url   String,  #contrib-balance-g-770
-      site_url   String,  #contrib-balance-g-771
-      cat_id     UInt32  DEFAULT 0,  #contrib-balance-g-772
-      cat_title  String  DEFAULT '',  #contrib-balance-g-773
-      updated_at DateTime  #contrib-balance-g-774
-    ) ENGINE = ReplacingMergeTree(updated_at)  #contrib-balance-g-775
-    ORDER BY feed_id  #contrib-balance-g-776
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS feeds (
+      feed_id    UInt32,
+      title      String,
+      feed_url   String,
+      site_url   String,
+      cat_id     UInt32  DEFAULT 0,
+      cat_title  String  DEFAULT '',
+      updated_at DateTime
+    ) ENGINE = ReplacingMergeTree(updated_at)
+    ORDER BY feed_id
   ")  #contrib-balance-g-777
   #contrib-balance-g-778
-  DBI::dbExecute(con, "  #contrib-balance-g-779
-    CREATE TABLE IF NOT EXISTS topic_summary (  #contrib-balance-g-780
-      topic       UInt32,  #contrib-balance-g-781
-      topic_label String,  #contrib-balance-g-782
-      n_articles  UInt64,  #contrib-balance-g-783
-      as_of       DateTime  #contrib-balance-g-784
-    ) ENGINE = ReplacingMergeTree(as_of)  #contrib-balance-g-785
-    ORDER BY (as_of, topic)  #contrib-balance-g-786
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS topic_summary (
+      topic       UInt32,
+      topic_label String,
+      n_articles  UInt64,
+      as_of       DateTime
+    ) ENGINE = ReplacingMergeTree(as_of)
+    ORDER BY (as_of, topic)
   ")  #contrib-balance-g-787
   #contrib-balance-g-788
   cli::cli_inform("ClickHouse schema ready.")  #contrib-balance-g-789
@@ -223,15 +223,15 @@ ch_read_articles <- function(con, where = NULL, limit = 10000L) {  #contrib-bala
 #'   \code{first_article}, \code{last_article}.  #contrib-balance-k-929  #cb-m
 #' @export  #contrib-balance-k-930  #cb-m
 ch_topic_summary <- function(con) {  #contrib-balance-k-931  #cb-m
-  DBI::dbGetQuery(con, "  #contrib-balance-k-932  #cb-m
-    SELECT  #contrib-balance-k-933  #cb-m
-      topic_label,  #contrib-balance-k-934  #cb-m
-      count()            AS n_articles,  #contrib-balance-k-935  #cb-m
-      min(published_at)  AS first_article,  #contrib-balance-k-936  #cb-m
-      max(published_at)  AS last_article  #contrib-balance-k-937  #cb-m
-    FROM articles FINAL  #contrib-balance-k-938  #cb-m
-    WHERE topic_label != ''  #contrib-balance-k-939  #cb-m
-    GROUP BY topic_label  #contrib-balance-k-940  #cb-m
-    ORDER BY n_articles DESC  #contrib-balance-k-941  #cb-m
+  DBI::dbGetQuery(con, "
+    SELECT
+      topic_label,
+      count()            AS n_articles,
+      min(published_at)  AS first_article,
+      max(published_at)  AS last_article
+    FROM articles FINAL
+    WHERE topic_label != ''
+    GROUP BY topic_label
+    ORDER BY n_articles DESC
   ")  #contrib-balance-k-942  #cb-m
 }  #contrib-balance-k-943  #cb-m
