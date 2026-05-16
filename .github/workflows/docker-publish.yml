@@ -1,41 +1,41 @@
-name: Build and Push Docker Images
+name: Build and Push Docker Images  #cb-gr-1
 
-on:
-  push:
-    branches: [main]
+on:  #cb-gr-2
+  push:  #cb-gr-3
+    branches: [main]  #cb-gr-4
 
-jobs:
-  build-shiny:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
+jobs:  #cb-gr-5
+  build-shiny:  #cb-gr-6
+    runs-on: ubuntu-latest  #cb-gr-7
+    permissions:  #cb-gr-8
+      contents: read  #cb-gr-9
+      packages: write  #cb-gr-10
+    steps:  #cb-gr-11
+      - uses: actions/checkout@v4  #cb-gr-12
 
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v3  #cb-gr-13
+        with:  #cb-gr-14
+          registry: ghcr.io  #cb-gr-15
+          username: ${{ github.actor }}  #cb-gr-16
+          password: ${{ secrets.GITHUB_TOKEN }}  #cb-gr-17
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3  #cb-gr-18
 
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ghcr.io/alexeypetrov1/ttrssr-shiny:latest
-          cache-from: type=gha,scope=shiny
-          cache-to: type=gha,scope=shiny,mode=max
+      - uses: docker/build-push-action@v6  #cb-gr-19
+        with:  #cb-gr-20
+          context: .  #cb-gr-21
+          file: Dockerfile  #cb-gr-22
+          platforms: linux/amd64  #cb-gr-23
+          push: true  #cb-gr-24
+          tags: ghcr.io/alexeypetrov1/ttrssr-shiny:latest  #cb-gr-25
+          cache-from: type=gha,scope=shiny  #cb-gr-26
+          cache-to: type=gha,scope=shiny,mode=max  #cb-gr-27
 
-  build-mcp:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+  build-mcp:  #cb-gr-28
+    runs-on: ubuntu-latest  #cb-gr-29
+    permissions:  #cb-gr-30
+      contents: read  #cb-gr-31
+      packages: write  #cb-gr-32
     steps:
       - uses: actions/checkout@v4
 
