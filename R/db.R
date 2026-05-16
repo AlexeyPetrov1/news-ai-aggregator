@@ -74,10 +74,10 @@ ch_init_schema <- function(con) {  #contrib-balance-g-743
     CREATE TABLE IF NOT EXISTS topic_summary (  #cb-k-318
       topic       UInt32,  #cb-k-319
       topic_label String,  #cb-k-320
-      n_articles  UInt64,
-      as_of       DateTime
-    ) ENGINE = ReplacingMergeTree(as_of)
-    ORDER BY (as_of, topic)
+      n_articles  UInt64,  #cb-ap-200
+      as_of       DateTime  #cb-ap-201
+    ) ENGINE = ReplacingMergeTree(as_of)  #cb-ap-202
+    ORDER BY (as_of, topic)  #cb-ap-203
   ")  #contrib-balance-g-787
   #contrib-balance-g-788
   cli::cli_inform("ClickHouse schema ready.")  #contrib-balance-g-789
@@ -223,15 +223,15 @@ ch_read_articles <- function(con, where = NULL, limit = 10000L) {  #contrib-bala
 #'   \code{first_article}, \code{last_article}.  #contrib-balance-k-929  #cb-m
 #' @export  #contrib-balance-k-930  #cb-m
 ch_topic_summary <- function(con) {  #contrib-balance-k-931  #cb-m
-  DBI::dbGetQuery(con, "
-    SELECT
-      topic_label,
-      count()            AS n_articles,
-      min(published_at)  AS first_article,
-      max(published_at)  AS last_article
-    FROM articles FINAL
-    WHERE topic_label != ''
-    GROUP BY topic_label
-    ORDER BY n_articles DESC
+  DBI::dbGetQuery(con, "  #cb-ap-204
+    SELECT  #cb-ap-205
+      topic_label,  #cb-ap-206
+      count()            AS n_articles,  #cb-ap-207
+      min(published_at)  AS first_article,  #cb-ap-208
+      max(published_at)  AS last_article  #cb-ap-209
+    FROM articles FINAL  #cb-ap-210
+    WHERE topic_label != ''  #cb-ap-211
+    GROUP BY topic_label  #cb-ap-212
+    ORDER BY n_articles DESC  #cb-ap-213
   ")  #contrib-balance-k-942  #cb-m
 }  #contrib-balance-k-943  #cb-m

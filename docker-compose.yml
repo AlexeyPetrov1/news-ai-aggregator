@@ -136,7 +136,7 @@ services:
 
   # ── Shiny Dashboard ──────────────────────────────────────────────────────
   shiny:
-    image: ghcr.io/alexeypetrov1/ttrssr-shiny:latest
+    image: ghcr.io/alexeypetrov1/ttrssr-shiny:latest  #cb-ap-214
     container_name: ttrss-shiny
     restart: unless-stopped
     networks:
@@ -167,8 +167,8 @@ services:
 
   # ── Scheduler (periodic fetch + write to ClickHouse) ─────────────────────
   scheduler:
-    image: ghcr.io/alexeypetrov1/ttrssr-shiny:latest
-    entrypoint: []
+    image: ghcr.io/alexeypetrov1/ttrssr-shiny:latest  #cb-ap-215
+    entrypoint: []  #cb-ap-216
     container_name: ttrss-scheduler
     restart: unless-stopped
     working_dir: /pkg/ttrssR
@@ -262,7 +262,7 @@ services:
 
   # ── MCP Server ───────────────────────────────────────────────────────────
   mcp:
-    image: ghcr.io/alexeypetrov1/ttrssr-mcp:latest
+    image: ghcr.io/alexeypetrov1/ttrssr-mcp:latest  #cb-ap-217
     container_name: ttrss-mcp
     restart: unless-stopped
     networks:
