@@ -136,11 +136,7 @@ services:
 
   # ── Shiny Dashboard ──────────────────────────────────────────────────────
   shiny:
-    platform: linux/amd64
-    build:
-      context:    .
-      dockerfile: Dockerfile
-    image: ttrssr-shiny:latest
+    image: ghcr.io/alexeypetrov1/ttrssr-shiny:latest
     container_name: ttrss-shiny
     restart: unless-stopped
     networks:
@@ -171,8 +167,7 @@ services:
 
   # ── Scheduler (periodic fetch + write to ClickHouse) ─────────────────────
   scheduler:
-    platform: linux/amd64
-    image: ttrssr-shiny:latest
+    image: ghcr.io/alexeypetrov1/ttrssr-shiny:latest
     container_name: ttrss-scheduler
     restart: unless-stopped
     working_dir: /pkg/ttrssR
@@ -266,11 +261,7 @@ services:
 
   # ── MCP Server ───────────────────────────────────────────────────────────
   mcp:
-    platform: linux/amd64
-    build:
-      context:    .
-      dockerfile: inst/mcp/Dockerfile
-    image: ttrssr-mcp:latest
+    image: ghcr.io/alexeypetrov1/ttrssr-mcp:latest
     container_name: ttrss-mcp
     restart: unless-stopped
     networks:
