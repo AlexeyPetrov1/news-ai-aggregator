@@ -283,67 +283,187 @@ YANDEX_CACHE_PATH=data/yandex_llm_cache.rds
 
 --- 
  
-## 9. Быстрый старт 
- 
-### 9.1. Требования 
- 
-- Docker Desktop; 
-- Docker Compose v2; 
-- R локально нужен только для ручного запуска и разработки; 
-- активный доступ к Yandex Cloud / AI Studio нужен только для `CLASSIFY_METHOD=yandex_llm`. 
- 
-### 9.2. Запуск
+## 9. Быстрый старт
 
-Скачайте `docker-compose.yml` и запустите стек одной командой:
+### Шаг 1 — Установить Docker Desktop
+
+Скачать с официального сайта: https://www.docker.com/products/docker-desktop/
+
+- **Windows**: скачать `.exe`, установить, перезагрузить компьютер. После запуска Docker Desktop в трее появится иконка кита.
+- **macOS**: скачать `.dmg`, перетащить в Applications, запустить.
+- **Linux**: установить Docker Engine + Docker Compose v2 по инструкции для вашего дистрибутива.
+
+> Убедитесь, что Docker запущен — иконка в трее активна, а команда `docker ps` выполняется без ошибок.
+
+---
+
+### Шаг 2 — Создать папку для проекта
 
 **Linux / macOS:**
-
 ```bash
-curl -O https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/docker-compose.yml
-docker compose up -d
+mkdir news-ai-aggregator
+cd news-ai-aggregator
 ```
 
 **Windows (PowerShell):**
+```powershell
+mkdir news-ai-aggregator
+cd news-ai-aggregator
+```
 
+---
+
+### Шаг 3 — Скачать docker-compose.yml
+
+**Linux / macOS:**
+```bash
+curl -O https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/docker-compose.yml
+```
+
+**Windows (PowerShell):**
 ```powershell
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/docker-compose.yml" -OutFile "docker-compose.yml"
+```
+
+Это единственный файл, который нужен. Репозиторий клонировать не нужно.
+
+---
+
+### Шаг 4 — Запустить проект
+
+```bash
 docker compose up -d
 ```
 
-Все образы подтянутся автоматически с `ghcr.io` — клонировать репозиторий не нужно.
+Эта команда:
+1. Скачает все образы с `ghcr.io` и Docker Hub (первый раз ~5-10 минут в зависимости от интернета)
+2. Создаст и запустит 6 контейнеров
+3. Вернёт управление в терминал (`-d` = detached, фоновый режим)
 
-> Если хотите изменить порты, пароли или метод классификации — создайте `.env` рядом с `docker-compose.yml` (см. [раздел 9.3](#93-настройка-env-опционально)). Без `.env` используются значения по умолчанию.
+---
 
-### 9.3. Настройка `.env` (опционально)
+### Шаг 5 — Проверить, что всё запустилось
 
-Нужен только если хотите изменить настройки по умолчанию. Скачайте шаблон:
+```bash
+docker compose ps
+```
+
+Ожидаемый результат:
+
+```
+NAME              STATUS
+clickhouse        Up (healthy)
+ttrss             Up (healthy)
+ttrss-db          Up (healthy)
+ttrss-init        Exited (0)      ← это нормально, one-shot задача
+ttrss-mcp         Up
+ttrss-scheduler   Up
+ttrss-shiny       Up
+```
+
+Если какой-то контейнер не поднялся — смотреть логи:
+```bash
+docker logs ttrss-scheduler
+```
+
+---
+
+### Шаг 6 — Открыть интерфейсы
+
+| Что | Адрес | Логин / пароль |
+|-----|-------|----------------|
+| TT-RSS (новостной ридер) | http://localhost:8080 | admin / password |
+| Shiny дашборд | http://localhost:3838/ttrss | — |
+| MCP healthcheck | http://localhost:8000/health | — |
+
+---
+
+### Шаг 7 — Дождаться первых данных
+
+Scheduler автоматически:
+1. Добавит RSS-ленты по кибербезопасности (~30 источников)
+2. Скачает статьи из TT-RSS
+3. Классифицирует их по темам (метод LDA по умолчанию)
+4. Запишет в ClickHouse
+
+Следить за процессом:
+```bash
+docker logs -f ttrss-scheduler
+```
+
+Первые данные появятся через **5-10 минут**. Затем scheduler обновляет данные каждый час.
+
+Проверить что данные записались:
+```bash
+docker exec -it clickhouse clickhouse-client --database ttrss --query "SELECT count() FROM articles FINAL"
+```
+
+Если число больше 0 — всё работает.
+
+---
+
+### Шаг 8 — Остановка и повторный запуск
+
+```bash
+# Остановить (данные сохраняются)
+docker compose down
+
+# Запустить снова
+docker compose up -d
+
+# Остановить и удалить все данные (полный сброс)
+docker compose down -v
+```
+
+---
+
+### Шаг 9 — Если нужно изменить настройки
+
+Скачать шаблон конфига:
 
 **Linux / macOS:**
-
 ```bash
 curl -O https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/.env.example
 cp .env.example .env
 ```
 
 **Windows (PowerShell):**
-
 ```powershell
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/AlexeyPetrov1/news-ai-aggregator/main/.env.example" -OutFile ".env.example"
 Copy-Item .env.example .env
 ```
 
-Минимально проверьте в `.env` (значения уже заданы в шаблоне, обычно достаточно для первого запуска с `lda`):
+Открыть `.env` в любом редакторе и изменить нужные параметры. Затем перезапустить:
+```bash
+docker compose up -d
+```
 
-- `TTRSS_ADMIN_USER` / `TTRSS_ADMIN_PASSWORD` — учётные данные TT-RSS;
-- `CH_DB`, `CH_USER`, `CH_PASSWORD` — параметры ClickHouse;
-- `MAX_ARTICLES` — лимит статей за цикл;
-- `SCHEDULER_INTERVAL_SECONDS` — частота опроса (секунды);
-- `CLASSIFY_METHOD` — метод классификации (`lda`, `kmeans`, `yandex_llm`, `llm`);
-- `N_TOPICS` — количество тем (для LDA / K-Means).
+Основные параметры в `.env`:
 
-> Файл `.env` содержит секреты — не коммитьте его в репозиторий.
+| Параметр | По умолчанию | Что делает |
+|----------|-------------|------------|
+| `TTRSS_PORT` | `8080` | Порт TT-RSS в браузере |
+| `TTRSS_ADMIN_PASSWORD` | `password` | Пароль от TT-RSS |
+| `SCHEDULER_INTERVAL_SECONDS` | `3600` | Как часто собирать новости (секунды) |
+| `CLASSIFY_METHOD` | `lda` | Метод классификации тем |
+| `MAX_ARTICLES` | `500` | Сколько статей обрабатывать за цикл |
 
-Полная пошаговая инструкция по каждой переменной — в **[разделе 9.4](#94-подробная-инструкция-по-созданию-env)**.
+Полная документация по каждой переменной — в **[разделе 9.4](#94-подробная-инструкция-по-созданию-env)**.
+
+---
+
+### Типовые проблемы
+
+**Порт уже занят** — если `8080` или другой порт занят, создайте `.env` и измените:
+```env
+TTRSS_PORT=8181
+```
+
+**Дашборд показывает пустой экран** — данные ещё не загрузились, подождите 10 минут и проверьте логи scheduler.
+
+**`docker compose` не найден** — убедитесь что установлен Docker Desktop (не просто Docker Engine), или обновите до версии с встроенным Compose v2.
+
+---
 
 ### 9.4. Подробная инструкция по созданию `.env`
 
