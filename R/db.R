@@ -35,20 +35,20 @@ ch_connect <- function(host     = Sys.getenv("CH_HOST",     "localhost"),  #cont
 #' @return \code{TRUE} invisibly.  #contrib-balance-g-741
 #' @export  #contrib-balance-g-742
 ch_init_schema <- function(con) {  #contrib-balance-g-743
-  DBI::dbExecute(con, "  #cb-g-317
-    CREATE TABLE IF NOT EXISTS articles (  #cb-g-318
-      article_id    UInt64        COMMENT 'TT-RSS article ID',  #cb-g-319
-      title         String        COMMENT 'Article title',  #cb-g-320
-      content       String        COMMENT 'Raw HTML content',  #cb-g-321
-      content_text  String        COMMENT 'Plain text (stripped HTML)',  #cb-g-322
-      link          String        COMMENT 'Source URL',  #cb-g-323
-      feed_id       UInt32        COMMENT 'TT-RSS feed ID',  #cb-g-324
-      feed_title    String        COMMENT 'Feed name',  #cb-g-325
-      author        String,  #cb-g-326
-      published_at  DateTime      COMMENT 'Original publication timestamp (UTC)',  #cb-g-327
-      fetched_at    DateTime      COMMENT 'When we fetched it',  #cb-g-328
-      is_unread     UInt8,  #cb-g-329
-      is_starred    UInt8,  #cb-g-330
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS articles (
+      article_id    UInt64        COMMENT 'TT-RSS article ID',
+      title         String        COMMENT 'Article title',
+      content       String        COMMENT 'Raw HTML content',
+      content_text  String        COMMENT 'Plain text (stripped HTML)',
+      link          String        COMMENT 'Source URL',
+      feed_id       UInt32        COMMENT 'TT-RSS feed ID',
+      feed_title    String        COMMENT 'Feed name',
+      author        String,
+      published_at  DateTime      COMMENT 'Original publication timestamp (UTC)',
+      fetched_at    DateTime      COMMENT 'When we fetched it',
+      is_unread     UInt8,
+      is_starred    UInt8,
       topic         UInt32        DEFAULT 0,  #cb-k-300
       topic_label   String        DEFAULT '',  #cb-k-301
       topic_prob    Float32       DEFAULT 0  #cb-k-302
