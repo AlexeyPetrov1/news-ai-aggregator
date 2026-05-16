@@ -49,31 +49,31 @@ ch_init_schema <- function(con) {  #contrib-balance-g-743
       fetched_at    DateTime      COMMENT 'When we fetched it',
       is_unread     UInt8,
       is_starred    UInt8,
-      topic         UInt32        DEFAULT 0,  #cb-k-300
-      topic_label   String        DEFAULT '',  #cb-k-301
-      topic_prob    Float32       DEFAULT 0  #cb-k-302
-    ) ENGINE = ReplacingMergeTree(fetched_at)  #cb-k-303
-    ORDER BY (published_at, article_id)  #cb-k-304
-    PARTITION BY toYYYYMM(published_at)  #cb-k-305
+      topic         UInt32        DEFAULT 0,
+      topic_label   String        DEFAULT '',
+      topic_prob    Float32       DEFAULT 0
+    ) ENGINE = ReplacingMergeTree(fetched_at)
+    ORDER BY (published_at, article_id)
+    PARTITION BY toYYYYMM(published_at)
   ")  #contrib-balance-g-764
   #contrib-balance-g-765
-  DBI::dbExecute(con, "  #cb-k-306
-    CREATE TABLE IF NOT EXISTS feeds (  #cb-k-307
-      feed_id    UInt32,  #cb-k-308
-      title      String,  #cb-k-309
-      feed_url   String,  #cb-k-310
-      site_url   String,  #cb-k-311
-      cat_id     UInt32  DEFAULT 0,  #cb-k-312
-      cat_title  String  DEFAULT '',  #cb-k-313
-      updated_at DateTime  #cb-k-314
-    ) ENGINE = ReplacingMergeTree(updated_at)  #cb-k-315
-    ORDER BY feed_id  #cb-k-316
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS feeds (
+      feed_id    UInt32,
+      title      String,
+      feed_url   String,
+      site_url   String,
+      cat_id     UInt32  DEFAULT 0,
+      cat_title  String  DEFAULT '',
+      updated_at DateTime
+    ) ENGINE = ReplacingMergeTree(updated_at)
+    ORDER BY feed_id
   ")  #contrib-balance-g-777
   #contrib-balance-g-778
-  DBI::dbExecute(con, "  #cb-k-317
-    CREATE TABLE IF NOT EXISTS topic_summary (  #cb-k-318
-      topic       UInt32,  #cb-k-319
-      topic_label String,  #cb-k-320
+  DBI::dbExecute(con, "
+    CREATE TABLE IF NOT EXISTS topic_summary (
+      topic       UInt32,
+      topic_label String,
       n_articles  UInt64,  #cb-ap-200
       as_of       DateTime  #cb-ap-201
     ) ENGINE = ReplacingMergeTree(as_of)  #cb-ap-202
